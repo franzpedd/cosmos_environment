@@ -1,0 +1,8 @@
+# paths
+.build/
+.vs/
+.vscode/
+cren/data/shader/compiled/
+
+# extensions
+.spv/
