@@ -19,6 +19,9 @@ namespace Cosmos
 			/// @brief tells the renderer we're going to create a customized viewport that is pottentially different than the one provided by cren (wich covers the entire window)
 			bool requestViewport = false;
 
+			/// @brief tells the renderer we're going to need validations (not a good idea on an physical android device, only emulated)
+			bool requestValidations = true;
+
 			/// @brief tells the window manager that the application will cover the entire window area
 			bool requestFullscreen = false;
 			
@@ -56,6 +59,9 @@ namespace Cosmos
 
 		/// @brief begins the updating cycle
 		void Run();
+		
+		/// @brief hints the closing of the application
+		void Quit();
 
 	public:
 

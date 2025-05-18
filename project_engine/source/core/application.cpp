@@ -6,7 +6,7 @@ namespace Cosmos
 {
     Application::Application(const CreateInfo& ci) : 
         mWindow(this, ci.appName, ci.width, ci.height, ci.requestFullscreen), 
-        mRenderer(this, ci.appName, ci.requestViewport),
+        mRenderer(this, ci.appName, ci.requestViewport, ci.requestValidations),
         mGUI(this)
     {
     
@@ -56,6 +56,11 @@ namespace Cosmos
             const double alpha = accumulator / FIXED_TIMESTEP;
             mRenderer.OnRender(alpha);
         }
+    }
+
+    void Application::Quit()
+    {
+        mWindow.Quit();
     }
 
     void Application::OnMinimize()

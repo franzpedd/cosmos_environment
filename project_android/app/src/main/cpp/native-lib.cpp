@@ -17,6 +17,7 @@ int main(int argc, char** argv) {
     ci.appName = "Resistor Calculator";
     ci.requestViewport = false;
     ci.requestFullscreen = true;
+    ci.requestValidations = false; // change this to true when emulation on new android versions
 
     Cosmos::Android::Application app(ci);
     app.Run();

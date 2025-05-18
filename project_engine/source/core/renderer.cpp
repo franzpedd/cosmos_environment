@@ -4,7 +4,7 @@
 
 namespace Cosmos
 {
-	Renderer::Renderer(Application* app, const char* appName, bool requestViewport) 
+	Renderer::Renderer(Application* app, const char* appName, bool requestViewport, bool validations)
         : mApp(app)
 	{
         // initialization
@@ -13,7 +13,7 @@ namespace Cosmos
         ci.appVersion = CREN_MAKE_VERSION(0, 1, 0, 0);
         ci.assetsRoot = "data";
         ci.apiVersion = CREN_MAKE_VERSION(0, 1, 0, 2);
-        ci.validations = 1;
+        ci.validations = validations;
         ci.vsync = 0;
         ci.msaa = 4;
         ci.width = mApp->GetWindowRef().GetWidth();

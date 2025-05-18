@@ -10,3 +10,5 @@
 
 # android-specific
 project_android/.idea/
+project_android/app/debug/
+project_android/app/release/

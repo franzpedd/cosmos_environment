@@ -51,7 +51,9 @@ namespace Cosmos
 		ImGuiIO& io = ImGui::GetIO(); (void)io;
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+		#ifdef PLATFORM_ANDROID
+		io.ConfigFlags |= ImGuiConfigFlags_IsTouchScreen;
+		#endif
 
 		if (io.BackendFlags | ImGuiBackendFlags_PlatformHasViewports && io.BackendFlags | ImGuiBackendFlags_RendererHasViewports) {
 			io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
@@ -314,10 +316,10 @@ namespace Cosmos
 		style->FramePadding = ImVec2(6.0f, 4.0f);
 		style->ItemSpacing = ImVec2(9.0f, 4.0f);
 		style->ItemInnerSpacing = ImVec2(3.0f, 3.0f);
-		style->TouchExtraPadding = ImVec2(0.0f, 0.0f);
+		style->TouchExtraPadding = ImVec2(10.0f, 10.0f);
 		style->IndentSpacing = 5.0f;
-		style->ScrollbarSize = 14.0f;
-		style->GrabMinSize = 10.0f;
+		style->ScrollbarSize = 20.0f;
+		style->GrabMinSize = 30.0f;
 		style->WindowBorderSize = 0.0f;
 		style->ChildBorderSize = 0.0f;
 		style->PopupBorderSize = 0.0f;

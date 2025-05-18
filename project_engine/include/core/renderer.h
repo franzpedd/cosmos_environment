@@ -12,7 +12,7 @@ namespace Cosmos
     public:
 
         /// @brief initializes the renderer with standart configurations
-        Renderer(Application* app, const char* appName, bool requestViewport);
+        Renderer(Application* app, const char* appName, bool requestViewport, bool validations);
 
         /// @brief shutsdown the renderer and release it's resources
         ~Renderer();

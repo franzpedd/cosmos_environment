@@ -35,9 +35,10 @@ namespace Cosmos::Android
         mApp->GetWindowRef().GetWindowSize(&width, &height);
         ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
         ImGui::SetNextWindowSize(ImVec2((float)width, (float)height));
+        ImGui::NewLine();
 
         // widget start
-        if(ImGui::Begin("Resistor Calculator", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse)) {
+        if(ImGui::Begin("Resistor Calculator", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar)) {
 
             Info();
 
@@ -67,19 +68,35 @@ namespace Cosmos::Android
 
             CalculateResistance(bandType);
 
+            ImGui::SetCursorPos(ImVec2(width - 70.0f, height / 2.0f));
+            if (ImGui::ArrowButton("##Up", ImGuiDir_Up)) {
+                ImGui::SetScrollY(ImGui::GetScrollY() - 300.0f);
+            }
+
+            ImGui::SetCursorPos(ImVec2(width - 70.0f, (height / 2.0f) + 75.0f));
+            if (ImGui::ArrowButton("##Down", ImGuiDir_Down)) {
+                ImGui::SetScrollY(ImGui::GetScrollY() + 300.0f);
+            }
+
             ImGui::End();
         }
     }
 
     void ResistorCalc::Info() {
-        if (CENTERED_CONTROL(ImGui::Button(ICON_LC_INFO " Resistor Calculator"))) { ImGui::OpenPopup("InfoPopup"); }
+        const char* title = ICON_LC_INFO " Resistor Calculator";
+        if (CENTERED_CONTROL(ImGui::Button(title, ImVec2(ImGui::CalcTextSize(title).x + 20.0f, 100.0f)))) { ImGui::OpenPopup("InfoPopup"); }
+        //ImGui::SameLine();
+        ImGui::SetCursorPosX(ImGui::GetContentRegionAvail().x - 150.0f);
+        if(ImGui::Button("Quit", ImVec2(150.0f, 100.0f))) {
+            mApp->Quit();
+        }
 
         ImGui::PushStyleColor(ImGuiCol_ModalWindowDimBg, ImVec4(0.1f, 0.15f, 0.2f, 0.5f)); // Example: dark blue-gray
         if (ImGui::BeginPopupModal("InfoPopup", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_HorizontalScrollbar)) {
-            ImGui::Text("This application was developed in C++ (and Java)");
-            ImGui::Text("It's purpose is to test a Vulkan 3D Renderer");
+            ImGui::Text("Developed in C++ (and Java)");
+            ImGui::Text("Vulkan API (Cosmos Engine)");
             ImGui::Text("It uses SDL3 for Window and ImGui for UI");
-            ImGui::Text("Code at: github.com/franzpedd/cosmos_environment");
+            ImGui::Text("github.com/franzpedd/cosmos_environment");
             if(CENTERED_CONTROL(ImGui::Button("Back"))) { ImGui::CloseCurrentPopup(); }
             ImGui::EndPopup();
         }

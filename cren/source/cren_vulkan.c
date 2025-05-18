@@ -151,7 +151,7 @@ static int internal_crenvk_instance_create(vkInstance* instance, const char* app
     instanceCI.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
     #endif
 
-    CREN_LOG("Creating Vulkan instance (without validations)...");
+    CREN_LOG("Creating Vulkan instance (without validations and latter using it)...");
     VkResult result = vkCreateInstance(&instanceCI, NULL, &instance->instance);
     if (result != VK_SUCCESS) {
         CREN_LOG("Failed to create instance (error %d). Trying fallback to Vulkan version 1.0", result);
@@ -385,6 +385,7 @@ static int internal_crenvk_create_logical_device(VkPhysicalDevice physicalDevice
     unsigned int queueFamilyIndices[3]; // store unique queue family indices
     unsigned int queueCount = 0;
     float queuePriority = 1.0f;
+    CREN_LOG("Indices Graphics: %d:%d - Present: %d:%d", indices.graphicFound, indices.graphicFamily, indices.presentFound, indices.presentFamily);
 
     if (indices.graphicFamily != -1) queueFamilyIndices[queueCount++] = indices.graphicFamily;
     if (indices.presentFamily != -1 && indices.presentFamily != indices.graphicFamily)  queueFamilyIndices[queueCount++] = indices.presentFamily;
@@ -412,7 +413,9 @@ static int internal_crenvk_create_logical_device(VkPhysicalDevice physicalDevice
 
     // required features
     VkPhysicalDeviceFeatures deviceFeatures = { 0 };
+    #ifndef PLATFORM_ANDROID // I know, this sucks
     deviceFeatures.shaderInt64 = VK_TRUE;
+    #endif
     deviceFeatures.samplerAnisotropy = VK_TRUE;
 
     // device create info
@@ -437,10 +440,8 @@ static int internal_crenvk_create_logical_device(VkPhysicalDevice physicalDevice
     }
 
     // create the device
-    if(vkCreateDevice(physicalDevice, &deviceCI, NULL, device) != VK_SUCCESS) {
-        crenmemory_deallocate(queueCreateInfos);
-        return 0;
-    }
+    VkResult res = vkCreateDevice(physicalDevice, &deviceCI, NULL, device);
+    if (res != VK_SUCCESS) CREN_LOG("Failed to create vulkan logical device VkResult: %d", res);
 
     // retrieve queues
     vkGetDeviceQueue(*device, indices.graphicFamily, 0, graphicsQueue);
@@ -458,16 +459,15 @@ static int internal_crenvk_create_logical_device(VkPhysicalDevice physicalDevice
 /// @param validations flags the validations are on/off
 /// @return 1 on success, 0 on failure
 static int internal_crenvk_device_create(CRenVulkanBackend* backend, void* nativeWindow, int validations) {
-
     if (cren_surface_create(backend->instance.instance, &backend->device.surface, nativeWindow) != 1) {
-        cren_set_error(Vulkan_SurfaceCreationFailed);
+        CREN_LOG("Failed to create window surface");
         return 0;
     }
 
     backend->device.physicalDevice = internal_crenvk_choose_physical_device(backend->instance.instance, backend->device.surface);
 
     if (!backend->device.physicalDevice) {
-        cren_set_error(Vulkan_PhysicalDeviceUnfit);
+        CREN_LOG("Unfit physical device choosen");
         vkDestroySurfaceKHR(backend->instance.instance, backend->device.surface, NULL);
         return 0;
     }
@@ -478,7 +478,6 @@ static int internal_crenvk_device_create(CRenVulkanBackend* backend, void* nativ
 
     // create logical device
     if(internal_crenvk_create_logical_device(backend->device.physicalDevice, backend->device.surface, &backend->device.device, &backend->device.graphicsQueue, &backend->device.presentQueue, &backend->device.computeQueue, validations) != 1) {
-        cren_set_error(Vulkan_DeviceCreationFailed);
         vkDestroySurfaceKHR(backend->instance.instance, backend->device.surface, NULL);
         return 0;
     }
@@ -610,18 +609,21 @@ int crenvk_device_create_buffer(VkDevice device, VkPhysicalDevice physicalDevice
 static vkSwapchainDetails internal_crenvk_query_swapchain_details(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
 {
     vkSwapchainDetails details = { 0 };
-
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &details.capabilities);
-    vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &details.surfaceFormatCount, NULL);
 
+    vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &details.surfaceFormatCount, NULL);
     if (details.surfaceFormatCount != 0) {
         details.pSurfaceFormats = (VkSurfaceFormatKHR*)crenmemory_allocate(details.surfaceFormatCount * sizeof(VkSurfaceFormatKHR), 1);
+
         if (details.pSurfaceFormats) {
             vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &details.surfaceFormatCount, details.pSurfaceFormats);
         }
     }
 
+    
     vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &details.presentModeCount, NULL);
+    
+
     if (details.presentModeCount != 0) {
         details.pPresentModes = (VkPresentModeKHR*)crenmemory_allocate(details.presentModeCount * sizeof(VkPresentModeKHR), 1);
         if (details.pPresentModes) {
@@ -699,7 +701,7 @@ static int internal_crenvk_swapchain_create(vkSwapchain* swapchain, VkDevice dev
     swapchain->swapchainFormat = internal_crenvk_choose_swapchain_surface_format(details.pSurfaceFormats, details.surfaceFormatCount);
     swapchain->swapchainPresentMode = internal_crenvk_choose_swapchain_present_mode(details.pPresentModes, details.presentModeCount, vsync);
     swapchain->swapchainExtent = internal_crenvk_choose_swapchain_extent(&details.capabilities, width, height);
-
+    
     // images in the swapchain
     swapchain->swapchainImageCount = details.capabilities.minImageCount + 1;
     if (details.capabilities.maxImageCount > 0 && swapchain->swapchainImageCount > details.capabilities.maxImageCount) swapchain->swapchainImageCount = details.capabilities.maxImageCount;
@@ -2643,7 +2645,6 @@ static void internal_crenvk_renderphase_viewport_update(vkViewportRenderphase* p
 
 int cren_vulkan_init(CRenVulkanBackend *backend, CRenCreateInfo* ci) {
 
-    CREN_LOG("Initializing vulkan code");
     backend->hint_viewport = ci->smallerViewport;
 
     int success = 1;
@@ -2651,7 +2652,7 @@ int cren_vulkan_init(CRenVulkanBackend *backend, CRenCreateInfo* ci) {
     success &= internal_crenvk_device_create(backend, ci->nativeWindow, ci->validations);
     success &= internal_crenvk_swapchain_create(&backend->swapchain, backend->device.device, backend->device.physicalDevice, backend->device.surface, ci->width, ci->height, ci->vsync);
     // swapchain does not have a pre-defined pipeline
-    
+
     backend->defaultRenderphase = internal_crenvk_renderphase_default_create (backend->device.device, backend->device.physicalDevice, backend->swapchain.swapchainFormat.format, (VkSampleCountFlagBits)ci->msaa, 0);
     success &= internal_crenvk_renderphase_default_commandpool_create(&backend->defaultRenderphase, &backend->device);
     success &= internal_crenvk_renderphase_default_framebuffers_create(&backend->defaultRenderphase, &backend->device, &backend->swapchain);

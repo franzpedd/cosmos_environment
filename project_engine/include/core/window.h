@@ -30,6 +30,9 @@ namespace Cosmos
 		/// @brief returns if a close request has been made and the window should be closed
 		inline bool const ShouldClose() const { return mShouldClose; }
 
+		/// @brief returns if a close request has been made and the window should be closed
+		inline void Quit() { mShouldClose = true; }
+
 		/// @brief returns if the window is currently minimized
 		inline bool const IsMinimized() const { return mMinimized; }
 
@@ -38,6 +41,7 @@ namespace Cosmos
 		/// @brief updates the input/output window devices as well as the windows events, call this at the begining of the frame
 		void OnUpdate();
 
+		
 		/// @brief hinds/shows the cursor on the window (locks it within the window if hidden)
 		void ToogleCursor(bool hide);
 
