@@ -3,8 +3,9 @@ project(GLFW LANGUAGES C)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-
-add_library(GLFW STATIC)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 set(GLFW_SOURCES
     glfw/src/context.c
@@ -21,8 +22,6 @@ set(GLFW_SOURCES
     glfw/src/null_window.c
 )
 
-target_include_directories(GLFW PUBLIC glfw/include)
-
 if(WIN32)
     list(APPEND GLFW_SOURCES
         glfw/src/egl_context.c
@@ -37,10 +36,6 @@ if(WIN32)
         glfw/src/win32_time.c
         glfw/src/win32_window.c
     )
-    
-    target_compile_definitions(GLFW PRIVATE _GLFW_WIN32 _CRT_SECURE_NO_WARNINGS)
-    target_compile_options(GLFW PRIVATE /wd4996 /wd5105)
-
 elseif(APPLE)
     list(APPEND GLFW_SOURCES
         glfw/src/egl_context.c
@@ -54,10 +49,6 @@ elseif(APPLE)
         glfw/src/posix_time.c
         glfw/src/cocoa_window.m
     )
-    
-    target_compile_definitions(GLFW PRIVATE _GLFW_COCOA)
-    set_source_files_properties(${GLFW_SOURCES} PROPERTIES LANGUAGE OBJC)
-
 elseif(UNIX AND NOT APPLE)
     list(APPEND GLFW_SOURCES
         glfw/src/egl_context.c
@@ -75,15 +66,22 @@ elseif(UNIX AND NOT APPLE)
         glfw/src/posix_poll.c
         glfw/src/xkb_unicode.c
     )
-    
+endif()
+
+# Now create the library AFTER all sources are ready
+add_library(GLFW STATIC ${GLFW_SOURCES})
+
+target_include_directories(GLFW PUBLIC glfw/include)
+
+if(WIN32)
+    target_compile_definitions(GLFW PRIVATE _GLFW_WIN32 _CRT_SECURE_NO_WARNINGS)
+    target_compile_options(GLFW PRIVATE /wd4996 /wd5105)
+elseif(APPLE)
+    target_compile_definitions(GLFW PRIVATE _GLFW_COCOA)
+    set_source_files_properties(${GLFW_SOURCES} PROPERTIES LANGUAGE OBJC)
+elseif(UNIX AND NOT APPLE)
     target_compile_definitions(GLFW PRIVATE _GLFW_X11)
     target_link_libraries(GLFW PRIVATE X11)
 endif()
-
-target_sources(GLFW PRIVATE ${GLFW_SOURCES})
-
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 set_target_properties(GLFW PROPERTIES FOLDER "Thirdparty")

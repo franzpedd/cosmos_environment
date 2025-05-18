@@ -4,7 +4,14 @@
 
 int main(int argc, char** argv) {
 
-    Cosmos::Editor::Application application;
+    Cosmos::Application::CreateInfo ci;
+    ci.appName = "Engine";
+    ci.requestViewport = true;
+    ci.requestFullscreen = false;
+    ci.width = 1366;
+    ci.height = 768;
+
+    Cosmos::Editor::Application application(ci);
     application.Run();
 
     return 0;

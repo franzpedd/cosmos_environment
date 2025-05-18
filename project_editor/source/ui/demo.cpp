@@ -9,29 +9,29 @@ namespace Cosmos::Editor
 
 	void Demo::OnUpdate()
 	{
-		double cursorX, cursorY = 0;
+		float cursorX, cursorY = 0;
 		mApp->GetWindowRef().GetCursorPosition(&cursorX, &cursorY);
 
 		CRenContext* renderer = mApp->GetRendererRef().GetContext();
 		CRenVulkanBackend* rendererBackend = (CRenVulkanBackend*)renderer->backend;
 
-		UI::Begin(ICON_FA_INFO_CIRCLE " Debug Info", nullptr);
+		ImGui::Begin(ICON_FA_INFO_CIRCLE " Debug Info", 0);
 
-		UI::SeparatorText("Engine");
+		ImGui::SeparatorText("Engine");
 
-		UI::Text("Timestep: %f", mApp->GetTimestep());
-		UI::Text("FPS: %d", mApp->GetAverageFPS());
-		UI::Text("Mouse Pos: %lf x %lf", cursorX, cursorY);
+		ImGui::Text("Timestep: %f", mApp->GetTimestep());
+		ImGui::Text("FPS: %d", mApp->GetAverageFPS());
+		ImGui::Text("Mouse Pos: %lf x %lf", cursorX, cursorY);
 		
-		UI::SeparatorText("Renderer");
+		ImGui::SeparatorText("Renderer");
 
-		UI::Text("Cam Pos (%.3f %.3f %.3f)", renderer->camera.viewPosition.x, renderer->camera.viewPosition.y, renderer->camera.viewPosition.z);
-		UI::Text("Cam Rot: (%.3f %.3f %.3f)", renderer->camera.rotation.x, renderer->camera.rotation.y, renderer->camera.rotation.z);
-		UI::Text("Cam Front: (%.3f %.3f %.3f)", renderer->camera.frontPosition.x, renderer->camera.frontPosition.y, renderer->camera.frontPosition.z);
-		UI::Text("Size (Swapchain): %dx%d", rendererBackend->swapchain.swapchainExtent.width, rendererBackend->swapchain.swapchainExtent.height);
+		ImGui::Text("Cam Pos (%.3f %.3f %.3f)", renderer->camera.viewPosition.x, renderer->camera.viewPosition.y, renderer->camera.viewPosition.z);
+		ImGui::Text("Cam Rot: (%.3f %.3f %.3f)", renderer->camera.rotation.x, renderer->camera.rotation.y, renderer->camera.rotation.z);
+		ImGui::Text("Cam Front: (%.3f %.3f %.3f)", renderer->camera.frontPosition.x, renderer->camera.frontPosition.y, renderer->camera.frontPosition.z);
+		ImGui::Text("Size (Swapchain): %dx%d", rendererBackend->swapchain.swapchainExtent.width, rendererBackend->swapchain.swapchainExtent.height);
 		
-		UI::End();
+		ImGui::End();
 
-		UI::ShowDemo();
+		ImGui::ShowDemoWindow();
 	}
 }

@@ -4,24 +4,40 @@
 #include "core/logger.h"
 #include "ui/icon.h"
 #include "ui/theme.h"
+#include "ui/wrapper_imgui.h"
 
-#define IMGUI_DEFINE_MATH_OPERATORS
-#include <imgui.h>
+#include <cren_error.h>
 
-#if defined(PLATFORM_WINDOWS)
+#if defined(_MSC_VER)
 #pragma warning(push)
 #pragma warning(disable : 26495)
 #endif
 
+#include <backends/imgui_impl_sdl3.cpp>
 #include <backends/imgui_impl_vulkan.cpp>
-#include <backends/imgui_impl_glfw.cpp>
+#include <imguizmo/imguizmo.h>
 
-#if defined(PLATFORM_WINDOWS)
+// fonts
+#include <lucide.c>
+#include <awesome.c>
+#include <robotomono_medium.c>
+
+#if defined(_MSC_VER)
 #pragma warning(pop)
 #endif
 
 namespace Cosmos
 {
+	static int Internal_SDL3_CreateVulkanSurface(ImGuiViewport* viewport, ImU64 vk_instance, const void* vk_allocator, ImU64* out_vk_surface)
+	{
+		ImGui_ImplSDL3_ViewportData* vd = (ImGui_ImplSDL3_ViewportData*)viewport->PlatformUserData;
+		(void)vk_allocator;
+
+		// lets use SDL's surface creation to easy-up things. Could potentially use cren_surface_create
+		bool ret = SDL_Vulkan_CreateSurface(vd->Window, (VkInstance)vk_instance, NULL, (VkSurfaceKHR*)out_vk_surface);
+		return ret ? 0 : 1; // ret ? VK_SUCCESS : VK_NOT_READY 
+	}
+
 	static ImFont* sIconFA = nullptr;
 	static ImFont* sIconLC = nullptr;
 	static ImFont* sRobotoMono = nullptr;
@@ -31,7 +47,7 @@ namespace Cosmos
 	{
 		// initial config
 		IMGUI_CHECKVERSION();
-		ImGui::CreateContext();
+		mContext = ImGui::CreateContext();
 		ImGuiIO& io = ImGui::GetIO(); (void)io;
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
@@ -40,26 +56,6 @@ namespace Cosmos
 		if (io.BackendFlags | ImGuiBackendFlags_PlatformHasViewports && io.BackendFlags | ImGuiBackendFlags_RendererHasViewports) {
 			io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 		}
-
-		static const ImWchar iconRanges1[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
-		static const ImWchar iconRanges2[] = { ICON_MIN_LC, ICON_MAX_LC, 0 };
-		constexpr float iconSize = 13.0f;
-		constexpr float fontSize = 18.0f;
-
-		ImFontConfig iconCFG;
-		iconCFG.MergeMode = true;
-		iconCFG.GlyphMinAdvanceX = iconSize;
-		iconCFG.PixelSnapH = true;
-
-		char roboto[128], awesome[128], lucide[128];
-		cren_get_path("font/txt-robotomono-medium.ttf", "../data", 0, roboto, sizeof(roboto));
-		cren_get_path("font/icon-awesome.ttf", "../data", 0, awesome, sizeof(awesome));
-		cren_get_path("font/icon-lucide.ttf", "../data", 0, lucide, sizeof(lucide));
-
-		sRobotoMono = io.Fonts->AddFontFromFileTTF(roboto, fontSize);
-		sIconFA = io.Fonts->AddFontFromFileTTF(awesome, iconSize, &iconCFG, iconRanges1);
-		sIconLC = io.Fonts->AddFontFromFileTTF(lucide, iconSize, &iconCFG, iconRanges2);
-		io.Fonts->Build();
 
 		io.IniFilename = "UI.ini";
 		io.WantCaptureMouse = true;
@@ -87,8 +83,11 @@ namespace Cosmos
 		CRenVulkanBackend* rendererBackend = (CRenVulkanBackend*)renderer->backend;
 
 		// sdl and vulkan initialization
-		ImGui::CreateContext();
-		ImGui_ImplGlfw_InitForVulkan(mApp->GetWindowRef().GetGLFWWindow(), true);
+		ImGuiPlatformIO& platformIO = ImGui::GetPlatformIO();
+		platformIO.Platform_CreateVkSurface = Internal_SDL3_CreateVulkanSurface;
+
+		ImGui::SetCurrentContext((ImGuiContext*)mContext);
+		ImGui_ImplSDL3_InitForVulkan(mApp->GetWindowRef().GetAPIWindow());
 
 		ImGui_ImplVulkan_InitInfo initInfo = {};
 		initInfo.Instance = rendererBackend->instance.instance;
@@ -102,9 +101,29 @@ namespace Cosmos
 		initInfo.Allocator = nullptr;
 		initInfo.RenderPass = rendererBackend->uiRenderphase.renderpass->renderPass;
 		ImGui_ImplVulkan_Init(&initInfo);
+		// fonts
+		constexpr const ImWchar iconRanges1[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
+		constexpr const ImWchar iconRanges2[] = { ICON_MIN_LC, ICON_MAX_LC, 0 };
+		#ifdef PLATFORM_ANDROID
+		CREN_LOG("[Android:Todo]: Figure out an automate way to resize things, maybe wait ImGui-texture branch?");
+		constexpr float iconSize = 13.0f;
+		constexpr float fontSize = 18.0f;
+		#else
+		constexpr float iconSize = 13.0f;
+		constexpr float fontSize = 18.0f;
+		#endif
 
-		// upload fonts
+		ImFontConfig iconCFG;
+		iconCFG.MergeMode = true;
+		iconCFG.GlyphMinAdvanceX = iconSize;
+		iconCFG.PixelSnapH = true;
+
+		sRobotoMono = io.Fonts->AddFontFromMemoryCompressedTTF(txt_robotomono_medium_compressed_data, txt_robotomono_medium_compressed_size, fontSize);
+		sIconFA = io.Fonts->AddFontFromMemoryCompressedTTF(icon_awesome_compressed_data, icon_awesome_compressed_size, iconSize, &iconCFG, iconRanges1);
+		sIconLC = io.Fonts->AddFontFromMemoryCompressedTTF(icon_lucide_compressed_data, icon_lucide_compressed_size, iconSize, &iconCFG, iconRanges2);
+		io.Fonts->Build();
 		ImGui_ImplVulkan_CreateFontsTexture();
+
 	}
 
 	GUI::~GUI()
@@ -114,21 +133,22 @@ namespace Cosmos
 		vkDeviceWaitIdle(rendererBackend->device.device);
 
 		ImGui_ImplVulkan_Shutdown();
-		ImGui_ImplGlfw_Shutdown();
+		ImGui_ImplSDL3_Shutdown();
 
 		for (auto& widget : mWidgets.GetElementsRef()) {
 			delete widget;
 		}
 
 		mWidgets.GetElementsRef().clear();
-		ImGui::DestroyContext();
+		ImGui::DestroyContext((ImGuiContext*)mContext);
 	}
 
 	void GUI::OnUpdate()
 	{
 		ImGui_ImplVulkan_NewFrame();
-		ImGui_ImplGlfw_NewFrame();
+		ImGui_ImplSDL3_NewFrame();
 		ImGui::NewFrame();
+		ImGuizmo::BeginFrame();
 
 		for (auto& widget : mWidgets.GetElementsRef()) {
 			widget->OnUpdate();
@@ -144,10 +164,10 @@ namespace Cosmos
 		}
 	}
 
-	void GUI::OnRender()
+	void GUI::OnRender(int stage)
 	{
 		for (auto& widget : mWidgets.GetElementsRef()) {
-			widget->OnRender();
+			widget->OnRender(stage);
 		}
 	}
 
@@ -203,6 +223,15 @@ namespace Cosmos
 
 	void GUI::OnResize(int width, int height)
 	{
+		//int pixel_width, pixel_height;
+		//SDL_GetWindowSizeInPixels(mApp->GetWindowRef().GetAPIWindow(), &pixel_width, &pixel_height);
+		//int logical_width, logical_height;
+		//SDL_GetWindowSize(mApp->GetWindowRef().GetAPIWindow(), &logical_width, &logical_height);
+		//
+		//ImGuiIO& io = ImGui::GetIO();
+		//io.DisplaySize = ImVec2((float)logical_width, (float)logical_height);
+		//io.DisplayFramebufferScale = ImVec2((float)pixel_width / (float)logical_width, (float)pixel_height / (float)logical_height);
+
 		for (auto& widget : mWidgets.GetElementsRef()) {
 			widget->OnResize(width, height);
 		}
@@ -250,6 +279,23 @@ namespace Cosmos
 		}
 	}
 
+	void GUI::OnDPIChange(float scale)
+	{
+		
+
+		// Apply to ImGui
+		ImGuiIO& io = ImGui::GetIO();
+		io.FontGlobalScale = scale;
+		//ImGui::GetStyle().ScaleAllSizes(scale);
+
+		//// Reload fonts if needed (with scaled size)
+		//if (io.Fonts->IsBuilt()) {
+		//	io.Fonts->Clear();
+		//}
+
+		
+	}
+
 	void GUI::SetMinImageCount(unsigned int count)
 	{
 		ImGui_ImplVulkan_SetMinImageCount(count);
@@ -265,8 +311,8 @@ namespace Cosmos
 	{
 		ImGuiStyle* style = &ImGui::GetStyle();
 		style->WindowPadding = ImVec2(10.0f, 10.0f);
-		style->FramePadding = ImVec2(3.0f, 3.0f);
-		style->ItemSpacing = ImVec2(6.0f, 6.0f);
+		style->FramePadding = ImVec2(6.0f, 4.0f);
+		style->ItemSpacing = ImVec2(9.0f, 4.0f);
 		style->ItemInnerSpacing = ImVec2(3.0f, 3.0f);
 		style->TouchExtraPadding = ImVec2(0.0f, 0.0f);
 		style->IndentSpacing = 5.0f;

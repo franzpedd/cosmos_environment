@@ -29,8 +29,8 @@ void crenmemory_zero(void* ptr, unsigned long long size) {
     memset(ptr, 0, size);
 }
 
-void* crenmemory_copy(void* dest, void* src, unsigned long long size) {
-    return memcpy(dest, &src, size);
+void* crenmemory_copy(void* dest, const void* src, unsigned long long size) {
+    return memcpy(dest, src, size);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -253,8 +253,8 @@ char* cren_strncpy(char* dest, const char* src, unsigned long long size) {
 
 
 unsigned long long crenid_generate() {
-    static uint64_t counter = 0;
-    uint64_t new_id;
+    static unsigned long long counter = 0;
+    unsigned long long new_id;
 
     cren_thread_lock();
     new_id = ++counter;

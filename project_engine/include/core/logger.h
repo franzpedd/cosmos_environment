@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+#include <vector>
+
 // comment-me on release without bugs
 #define COSMOS_LOGGER_ENABLED
 
@@ -37,6 +40,31 @@ namespace Cosmos
 	/// @param message custom message about the error
 	/// @param any variadict arguments, much like printf's
 	void LogToFile(LogSeverity severity, const char* path, const char* file, int line, const char* message, ...);
+
+	class LoggerTracer
+	{
+	public:
+		struct Message
+		{
+			LogSeverity severity;
+			std::string message;
+		};
+
+	public:
+
+		/// @brief returns the instance
+		static LoggerTracer& GetInstance();
+
+		/// @brief returns all the messages on the console tracer
+		inline std::vector<Message>& GetMessagesRef() { return mConsoleMessages; }
+
+		/// @brief cleans-up all message logs in the console tracer
+		inline void Cleanup() { mConsoleMessages.clear(); }
+
+	private:
+
+		std::vector<Message> mConsoleMessages;
+	};
 }
 
 #define COSMOS_LOG(severity, ...) Cosmos::LogToTerminal(severity, __FILE__, __LINE__, __VA_ARGS__);

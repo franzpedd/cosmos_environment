@@ -1,0 +1,6 @@
+[submodule "project_thirdparty/sdl"]
+	path = project_thirdparty/sdl
+	url = https://github.com/libsdl-org/SDL.git
+[submodule "project_thirdparty/glfw/glfw"]
+	path = project_thirdparty/glfw/glfw
+	url = https://github.com/glfw/glfw

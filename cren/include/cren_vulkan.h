@@ -7,6 +7,8 @@
 #include "cren_platform.h"
 #include "cren_utils.h"
 
+#include <vulkan/vulkan.h>
+
 #ifdef __cplusplus 
 extern "C" {
 #endif
@@ -54,7 +56,6 @@ typedef struct {
     VkFence* framesInFlightFences;
 } vkDevice;
 
-
 /// @brief creates a gpu buffer
 /// @param device vulkan device
 /// @param physicalDevice vulkan physical device
@@ -65,7 +66,7 @@ typedef struct {
 /// @param memory the output buffer memory
 /// @param data data to map the buffer to, or NULL if no data is to be sent
 /// @return 1 on success, 0 on failure
-int crenvk_device_create_buffer(VkDevice device, VkPhysicalDevice physicalDevice, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkDeviceSize size, VkBuffer* buffer, VkDeviceMemory* memory, void* data);
+CREN_API int crenvk_device_create_buffer(VkDevice device, VkPhysicalDevice physicalDevice, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkDeviceSize size, VkBuffer* buffer, VkDeviceMemory* memory, void* data);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Swapchain-related
@@ -197,32 +198,26 @@ typedef struct {
 	VkPipelineColorBlendStateCreateInfo colorBlendState;
 } vkPipeline;
 
-/// @brief cren types of render stages exists
-typedef enum {
-	VK_RENDER_STAGE_DEFAULT = 0,
-	VK_RENDER_STAGE_PICKING
-} vkRenderStage;
-
 /// @brief creates a cren vulkan pipeline
 /// @param device cren vulkan pipeline
 /// @param ci pipeline create info
 /// @return the pipeline or NULL if an error has happend
-vkPipeline* crenvk_pipeline_create(VkDevice device, vkPipelineCreateInfo* ci);
+CREN_API vkPipeline* crenvk_pipeline_create(VkDevice device, vkPipelineCreateInfo* ci);
 
 /// @brief destroys a cren vulkan pipeline
 /// @param device cren vulkan device
 /// @param pipeline cren vulkan pipeline
-void crenvk_pipeline_destroy(VkDevice device, vkPipeline* pipeline);
+CREN_API void crenvk_pipeline_destroy(VkDevice device, vkPipeline* pipeline);
 
 /// @brief builds a pipeline with it's setup configuration
 /// @param device vulkan device
 /// @param pipeline cren vulkan pipeline
-void crenvk_pipeline_build(VkDevice device, vkPipeline* pipeline);
+CREN_API void crenvk_pipeline_build(VkDevice device, vkPipeline* pipeline);
 
 /// @brief destroy all resources related to the renderpass and itself
 /// @param device vulkan device
 /// @param renderpass cren vulkan renderpass
-void crenvk_renderpass_destroy(VkDevice device, vkRenderpass* renderpass);
+CREN_API void crenvk_renderpass_destroy(VkDevice device, vkRenderpass* renderpass);
 
 /// @brief creates a cren vulkan shader
 /// @param device vulkan device
@@ -230,18 +225,18 @@ void crenvk_renderpass_destroy(VkDevice device, vkRenderpass* renderpass);
 /// @param path SPIRV shader's path
 /// @param type the type of shader
 /// @return the cren vulkan shader
-vkShader crenvk_shader_create(VkDevice device, const char* name, const char* path, vkShaderType type);
+CREN_API vkShader crenvk_shader_create(VkDevice device, const char* name, const char* path, vkShaderType type);
 
 /// @brief destroys the shader's resources
 /// @param device vulkan device
 /// @param shader shader object
-void crenvk_shader_destroy(VkDevice device, vkShader shader);
+CREN_API void crenvk_shader_destroy(VkDevice device, vkShader shader);
 
 /// @brief checks if two given vertices are equivalent/same
 /// @param v0 vertex to compare to
 /// @param v1 vertex to be compared
 /// @return 1 on equals, 0 otherwise
-int crenvk_vertex_equals(vkVertex* v0, vkVertex* v1);
+CREN_API int crenvk_vertex_equals(vkVertex* v0, vkVertex* v1);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Renderphase-related
@@ -307,7 +302,7 @@ typedef struct {
 	VkDescriptorSet descriptorSet;
 
 	// viewport boundaries
-	float2 vpPosition;
+    float2 vpPosition;
 	float2 vpSize;
 	float2 vpMin;
 	float2 vpMax;
@@ -339,21 +334,21 @@ typedef struct {
 /// @param backend ptr to the backend
 /// @param ci ptr to the create info specification
 /// @return 1 on success, 0 on failure
-int cren_vulkan_init(CRenVulkanBackend* backend, CRenCreateInfo* ci);
+CREN_API int cren_vulkan_init(CRenVulkanBackend* backend, CRenCreateInfo* ci);
 
 /// @brief shuts down all vulkan resources used by cren, this is called by cren
 /// @param backend vulkan backend memory address
-void cren_vulkan_shutdown(CRenVulkanBackend* backend);
+CREN_API void cren_vulkan_shutdown(CRenVulkanBackend* backend);
 
 /// @brief updates the current frame
 /// @param context cren context memory address
 /// @param timestep interpolation value between frames
-void cren_vulkan_update(CRenContext* context, double timestep);
+CREN_API void cren_vulkan_update(CRenContext* context, double timestep);
 
 /// @brief renders the current frame
 /// @param context cren context memory address
 /// @param timestep interpolation value between frames
-void cren_vulkan_render(CRenContext* context, double timestep);
+CREN_API void cren_vulkan_render(CRenContext* context, double timestep);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Image-related
@@ -375,7 +370,7 @@ void cren_vulkan_render(CRenContext* context, double timestep);
 /// @param memoryProperties image's memory property
 /// @param flags image's flag, usually 0
 /// @return 
-int crenvk_image_create(unsigned int width, unsigned int height, unsigned int mipLevels, unsigned int arrayLayers, VkDevice device, VkPhysicalDevice physicalDevice, VkImage* image, VkDeviceMemory* memory, VkFormat format, VkSampleCountFlagBits samples, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags memoryProperties, VkImageCreateFlags flags);
+CREN_API int crenvk_image_create(unsigned int width, unsigned int height, unsigned int mipLevels, unsigned int arrayLayers, VkDevice device, VkPhysicalDevice physicalDevice, VkImage* image, VkDeviceMemory* memory, VkFormat format, VkSampleCountFlagBits samples, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags memoryProperties, VkImageCreateFlags flags);
 
 /// @brief creates and reutnrs a vulkan image view based on arguments configuration
 /// @param device vulkan device
@@ -386,7 +381,7 @@ int crenvk_image_create(unsigned int width, unsigned int height, unsigned int mi
 /// @param layerCount how many layers the image view has, usually 1
 /// @param viewType viewing type, usually VK_IMAGE_VIEW_TYPE_2D
 /// @return the image view
-VkImageView crenvk_image_view_create(VkDevice device, VkImage image, VkFormat format, VkImageAspectFlags aspect, unsigned int mipLevel, unsigned int layerCount, VkImageViewType viewType);
+CREN_API VkImageView crenvk_image_view_create(VkDevice device, VkImage image, VkFormat format, VkImageAspectFlags aspect, unsigned int mipLevel, unsigned int layerCount, VkImageViewType viewType);
 
 /// @brief creates a vulkan image sampler
 /// @param device vulkan device
@@ -398,7 +393,7 @@ VkImageView crenvk_image_view_create(VkDevice device, VkImage image, VkFormat fo
 /// @param w address mode
 /// @param mipLevels desired miplevel
 /// @return the created sampler
-VkSampler crenvk_image_sampler_create(VkDevice device, VkPhysicalDevice physicalDevice, VkFilter min, VkFilter mag, VkSamplerAddressMode u, VkSamplerAddressMode v, VkSamplerAddressMode w, float mipLevels);
+CREN_API VkSampler crenvk_image_sampler_create(VkDevice device, VkPhysicalDevice physicalDevice, VkFilter min, VkFilter mag, VkSamplerAddressMode u, VkSamplerAddressMode v, VkSamplerAddressMode w, float mipLevels);
 
 /// @brief creates a descriptor set based on sampler and view
 /// @param device vulkan device
@@ -407,7 +402,7 @@ VkSampler crenvk_image_sampler_create(VkDevice device, VkPhysicalDevice physical
 /// @param sampler image's sampler
 /// @param view image's view
 /// @return the created descriptor set
-VkDescriptorSet crenvk_image_descriptor_set_create(VkDevice device, VkDescriptorPool descriptorPool, VkDescriptorSetLayout descriptorSetLayout, VkSampler sampler, VkImageView view);
+CREN_API VkDescriptorSet crenvk_image_descriptor_set_create(VkDevice device, VkDescriptorPool descriptorPool, VkDescriptorSetLayout descriptorSetLayout, VkSampler sampler, VkImageView view);
 
 /// @brief generates mipmaps for the image
 /// @param device vulkan device
@@ -417,7 +412,7 @@ VkDescriptorSet crenvk_image_descriptor_set_create(VkDevice device, VkDescriptor
 /// @param height image's height
 /// @param mipLevels the desired miplevels
 /// @param image the reference image
-void crenvk_image_mipmaps_create(VkDevice device, VkQueue queue, VkCommandPool cmdPool, int width, int height, int mipLevels, VkImage image);
+CREN_API void crenvk_image_mipmaps_create(VkDevice device, VkQueue queue, VkCommandPool cmdPool, int width, int height, int mipLevels, VkImage image);
 
 /// @brief inserts a memory barrier in the image, changing image layout
 /// @param cmdBuffer command buffer
@@ -429,7 +424,7 @@ void crenvk_image_mipmaps_create(VkDevice device, VkQueue queue, VkCommandPool c
 /// @param srcStageMask pipeline stage mask
 /// @param dstStageMask pipeline stage mask
 /// @param subresourceRange VkImageSubresourceRange object
-void crenvk_image_memory_barrier_insert(VkCommandBuffer cmdBuffer, VkImage image, VkAccessFlags srcAccessFlags, VkAccessFlags dstAccessFlags, VkImageLayout oldImageLayout, VkImageLayout newImageLayout, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask, VkImageSubresourceRange subresourceRange);
+CREN_API void crenvk_image_memory_barrier_insert(VkCommandBuffer cmdBuffer, VkImage image, VkAccessFlags srcAccessFlags, VkAccessFlags dstAccessFlags, VkImageLayout oldImageLayout, VkImageLayout newImageLayout, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask, VkImageSubresourceRange subresourceRange);
 
 /// @brief changes the image layout
 /// @param device vulkan device
@@ -441,7 +436,7 @@ void crenvk_image_memory_barrier_insert(VkCommandBuffer cmdBuffer, VkImage image
 /// @param mipLevels image's mip level
 /// @param layerCount image's layer count, usually 1
 /// @return 1 on success, 0 on failure
-int crenvk_image_transition_layout(VkDevice device, VkQueue queue, VkCommandPool cmdPool, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels, unsigned int layerCount);
+CREN_API int crenvk_image_transition_layout(VkDevice device, VkQueue queue, VkCommandPool cmdPool, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, unsigned int mipLevels, unsigned int layerCount);
 
 /// @brief returns the most suitable format within the listed ones
 /// @param physicalDevice vulkan physical device
@@ -450,12 +445,12 @@ int crenvk_image_transition_layout(VkDevice device, VkQueue queue, VkCommandPool
 /// @param tiling tiling mode
 /// @param features format features
 /// @return the most suitable format or asserts if none could be found
-VkFormat crenvk_find_suitable_format(VkPhysicalDevice physicalDevice, const VkFormat* candidates, unsigned int candidatesCount, VkImageTiling tiling, VkFormatFeatureFlags features);
+CREN_API VkFormat crenvk_find_suitable_format(VkPhysicalDevice physicalDevice, const VkFormat* candidates, unsigned int candidatesCount, VkImageTiling tiling, VkFormatFeatureFlags features);
 
 /// @brief returns the most suitable depth format available from a defined list
 /// @param physicalDevice vulkan physical device
 /// @return the choosen format
-VkFormat crenvk_find_depth_format(VkPhysicalDevice physicalDevice);
+CREN_API VkFormat crenvk_find_depth_format(VkPhysicalDevice physicalDevice);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Buffer-related
@@ -470,6 +465,7 @@ typedef struct {
 /// @brief cren camera buffer
 typedef struct {
     align_as(16) mat4 view;
+    align_as(16) mat4 viewInverse;
     align_as(16) mat4 proj;
 } vkBufferCamera;
 
@@ -488,23 +484,23 @@ typedef struct {
 /// @param memoryFlags desired memory flags for the buffer
 /// @param size the buffer's size in bytes
 /// @return the created vkBuffer or NULL if an error has ocurred
-vkBuffer* crenvk_buffer_create(VkDevice device, VkPhysicalDevice physicalDevice, VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags memoryFlags, VkDeviceSize size);
+CREN_API vkBuffer* crenvk_buffer_create(VkDevice device, VkPhysicalDevice physicalDevice, VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags memoryFlags, VkDeviceSize size);
 
 /// @brief destroys the buffer and release it's resources
 /// @param buffer cren vulkan buffer to be destroyed
 /// @param device vulkan device
-void crenvk_buffer_destroy(vkBuffer* buffer, VkDevice device);
+CREN_API void crenvk_buffer_destroy(vkBuffer* buffer, VkDevice device);
 
 /// @brief maps the buffer, making it to be cpu-visible
 /// @param buffer buffer to map
 /// @param device vulkan device
 /// @return 1 on success/already mapped, 0 on failure
-int crenvk_buffer_map(vkBuffer* buffer, VkDevice device);
+CREN_API int crenvk_buffer_map(vkBuffer* buffer, VkDevice device);
 
 /// @brief unmaps a buffer, making it cpu-nonvisible
 /// @param buffer buffer to unmap
 /// @param device vulkan device
-void crenvk_buffer_unmap(vkBuffer* buffer, VkDevice device);
+CREN_API void crenvk_buffer_unmap(vkBuffer* buffer, VkDevice device);
 
 /// @brief creates a command buffer
 /// @param device vulkan device
@@ -512,25 +508,25 @@ void crenvk_buffer_unmap(vkBuffer* buffer, VkDevice device);
 /// @param level the commandbuffer level, usualy VK_COMMAND_BUFFER_LEVEL_PRIMARY
 /// @param begin hints the start of the recording
 /// @return the created command buffer
-VkCommandBuffer crenvk_commandbuffer_create(VkDevice device, VkCommandPool cmdPool, VkCommandBufferLevel level, int begin);
+CREN_API VkCommandBuffer crenvk_commandbuffer_create(VkDevice device, VkCommandPool cmdPool, VkCommandBufferLevel level, int begin);
 
 /// @brief creates a command buffer designed to be used once
 /// @param device vulkan device
 /// @param cmdPool wich command pool to record the command buffer into
 /// @return the created command buffer
-VkCommandBuffer crenvk_commandbuffer_begin_singletime(VkDevice device, VkCommandPool cmdPool);
+CREN_API VkCommandBuffer crenvk_commandbuffer_begin_singletime(VkDevice device, VkCommandPool cmdPool);
 
 /// @brief ends the recording of a command buffer previously created for the one-time usage
 /// @param device vulkan device
 /// @param cmdPool wich command pool to record the command buffer into
 /// @param cmdBuffer the command buffer
 /// @param queue wich queue to send the command buffer, usually graphics
-void crenvk_commandbuffer_end_singletime(VkDevice device, VkCommandPool cmdPool, VkCommandBuffer cmdBuffer, VkQueue queue);
+CREN_API void crenvk_commandbuffer_end_singletime(VkDevice device, VkCommandPool cmdPool, VkCommandBuffer cmdBuffer, VkQueue queue);
 
 /// @brief starts the recording of a command buffer
 /// @param cmdBuffer the command buffer
 /// @return 1 on success, 0 on failure
-int crenvk_commandbuffer_begin(VkCommandBuffer cmdBuffer);
+CREN_API int crenvk_commandbuffer_begin(VkCommandBuffer cmdBuffer);
 
 /// @brief stops the recording of a command buffer and send it to the gpu
 /// @param device vulkan device
@@ -539,7 +535,7 @@ int crenvk_commandbuffer_begin(VkCommandBuffer cmdBuffer);
 /// @param queue wich queue to send the command buffer, usually graphics
 /// @param free hints the command buffers to be freed
 /// @return 1 on success, 0 on failure
-int crenvk_commandbuffer_end(VkDevice device, VkCommandPool cmdPool, VkCommandBuffer cmdBuffer, VkQueue queue, int free);
+CREN_API int crenvk_commandbuffer_end(VkDevice device, VkCommandPool cmdPool, VkCommandBuffer cmdBuffer, VkQueue queue, int free);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Texture-related
@@ -576,34 +572,34 @@ typedef struct {
 /// @param path the texture's disk path
 /// @param gui hints the texture to be used in the ui
 /// @return the created 2d texture
-CRenTexture2D crenvk_texture2d_create_from_path(CRenContext* context, const char* path, int gui);
+CREN_API CRenTexture2D crenvk_texture2d_create_from_path(CRenContext* context, const char* path, int gui);
 
 /// @brief creates a vulakn texture 2d from a buffer
 /// @param context cren context
 /// @param bufferInfo the buffer data
 /// @param gui hints the texture to be used in the ui
 /// @return the created 2d texture
-CRenTexture2D crenvk_texture2d_create_from_buffer(CRenContext* context, CrenTexture2DBuffer* bufferInfo, int gui);
+CREN_API CRenTexture2D crenvk_texture2d_create_from_buffer(CRenContext* context, CrenTexture2DBuffer* bufferInfo, int gui);
 
 /// @brief release the resources used by the texture
 /// @param context cren context
 /// @param texture the texture to have it's resources released
-void crenvk_texture2d_destroy(CRenContext* context, CRenTexture2D* texture);
+CREN_API void crenvk_texture2d_destroy(CRenContext* context, CRenTexture2D* texture);
 
 /// @brief returns the texture's sampler
 /// @param cren texture
 /// @return texture's VkSampler object
-VkSampler crenvk_texture2d_get_sampler(CRenTexture2D* texture);
+CREN_API VkSampler crenvk_texture2d_get_sampler(CRenTexture2D* texture);
 
 /// @brief returns the texture's iamge view
 /// @param cren texture
 /// @return texture's VkImageView object
-VkImageView crenvk_texture2d_get_image_view(CRenTexture2D* texture);
+CREN_API VkImageView crenvk_texture2d_get_image_view(CRenTexture2D* texture);
 
 /// @brief returns the texture's descriptor, usually used in ui
 /// @param cren texture
 /// @return texture's VkDescriptorSet object
-VkDescriptorSet crenvk_texture2d_get_descriptor(CRenTexture2D* texture);
+CREN_API VkDescriptorSet crenvk_texture2d_get_descriptor(CRenTexture2D* texture);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Quad-related
@@ -637,24 +633,24 @@ typedef struct {
 /// @param context cren context
 /// @param albedoPath the quad colormap
 /// @return the created quad
-CRenQuad* crenvk_quad_create(CRenContext* context, const char* albedoPath);
+CREN_API CRenQuad* crenvk_quad_create(CRenContext* context, const char* albedoPath);
 
 /// @brief release all resources used by a quad
 /// @param context cren context
 /// @param quad the quad to destroy
-void crenvk_quad_destroy(CRenContext* context, CRenQuad* quad);
+CREN_API void crenvk_quad_destroy(CRenContext* context, CRenQuad* quad);
 
 /// @brief sends newer data to the gpu about the quad
 /// @param context cren context
 /// @param quad the quad to update
-void crenvk_quad_apply_buffer_changes(CRenContext* context, CRenQuad* quad);
+CREN_API void crenvk_quad_apply_buffer_changes(CRenContext* context, CRenQuad* quad);
 
 /// @brief renders the quad
 /// @param context cren quad
 /// @param stage wich render stage is, picking/default
 /// @param quad the quad to render
 /// @param transform quad's transformation matrix
-void crenvk_quad_render(CRenContext* context, vkRenderStage stage, CRenQuad* quad, const mat4 transform);
+CREN_API void crenvk_quad_render(CRenContext* context, CRenRenderStage stage, CRenQuad* quad, const mat4 transform);
 
 #ifdef __cplusplus 
 }

@@ -4,9 +4,12 @@
 
 namespace Cosmos
 {
-    Application::Application()
-        : mWindow(this, "Engine", 1366, 728), mRenderer(this), mGUI(this)
+    Application::Application(const CreateInfo& ci) : 
+        mWindow(this, ci.appName, ci.width, ci.height, ci.requestFullscreen), 
+        mRenderer(this, ci.appName, ci.requestViewport),
+        mGUI(this)
     {
+    
     }
 
     Application::~Application()
@@ -31,7 +34,7 @@ namespace Cosmos
             mWindow.OnUpdate();
             mGUI.OnUpdate();
 
-            mTimeStep = d_min(mTimeStep, 0.1); // max 100ms
+            mTimeStep = f_min(mTimeStep, 0.1); // max 100ms
             accumulator += mTimeStep;
 
             // average frames per second
@@ -57,39 +60,93 @@ namespace Cosmos
 
     void Application::OnMinimize()
     {
+        mRenderer.Minimize();
+        mGUI.OnMinimize();
     }
 
     void Application::OnRestore(int width, int height)
     {
+        mRenderer.Restore();
+        mGUI.OnRestore(width, height);
     }
 
     void Application::OnResize(int width, int height)
     {
+        mRenderer.Resize(width, height);
+        mGUI.OnResize(width, height);
     }
 
     void Application::OnKeyPress(Input::Keycode keycode, Input::Keymod mod, bool held)
     {
+        mGUI.OnKeyPress(keycode, mod, held);
+
+        // camera
+        CRenCamera& cam = mRenderer.GetContext()->camera;
+        if (cam.shouldMove) {
+            if (keycode == Input::KEYCODE_A) cam.movingForward = 1;
+            if (keycode == Input::KEYCODE_S) cam.movingBackward = 1;
+            if (keycode == Input::KEYCODE_A) cam.movingLeft = 1;
+            if (keycode == Input::KEYCODE_D) cam.movingRight = 1;
+            if (keycode == Input::KEYCODE_LSHIFT) cam.modifierPressed = 1;
+        }
     }
 
     void Application::OnKeyRelease(Input::Keycode keycode)
     {
+        mGUI.OnKeyRelease(keycode);
+
+        // camera
+        CRenCamera& cam = mRenderer.GetContext()->camera;
+        if (cam.shouldMove) {
+            if (keycode == Input::KEYCODE_W) cam.movingForward = 0;
+            if (keycode == Input::KEYCODE_S) cam.movingBackward = 0;
+            if (keycode == Input::KEYCODE_A) cam.movingLeft = 0;
+            if (keycode == Input::KEYCODE_D) cam.movingRight = 0;
+            if (keycode == Input::KEYCODE_LSHIFT) cam.modifierPressed = 0;
+        }
     }
 
     void Application::OnButtonPress(Input::Buttoncode buttoncode, Input::Keymod mod)
     {
+        mGUI.OnButtonPress(buttoncode, mod);
     }
 
     void Application::OnButtonRelease(Input::Buttoncode buttoncode)
     {
+        mGUI.OnButtonRelease(buttoncode);
     }
 
     void Application::OnMouseScroll(double xoffset, double yoffset)
     {
+        mGUI.OnMouseScroll(xoffset, yoffset);
     }
 
     void Application::OnMouseMove(double xpos, double ypos)
     {
+        mGUI.OnMouseMove(xpos, ypos);
+
+        // camera
+        CRenCamera& cam = mRenderer.GetContext()->camera;
+        if (cam.shouldMove) {
+
+            // avoid scene flip
+            if (cam.rotation.x >= 89.0f) cam.rotation.x = 89.0f;
+            if (cam.rotation.x <= -89.0f) cam.rotation.x = -89.0f;
+
+            // reset rotation on 360 degrees
+            if (cam.rotation.x >= 360.0f) cam.rotation.x = 0.0f;
+            if (cam.rotation.x <= -360.0f) cam.rotation.x = 0.0f;
+            if (cam.rotation.y >= 360.0f) cam.rotation.y = 0.0f;
+            if (cam.rotation.y <= -360.0f) cam.rotation.y = 0.0f;
+
+            float rotationspeed = 1.0f;
+            float3 rot = { float(-ypos) * rotationspeed * 0.5f , float(xpos) * rotationspeed * 0.5f, 0.0f };
+            cren_camera_rotate(&cam, rot);
+        }
     }
 
-
+    void Application::OnDPIChange(float scale)
+    {
+        mGUI.OnDPIChange(scale);
+    }
 }

@@ -3,15 +3,17 @@ This repo is home of the CRen project as well as projects that uses it. CRen its
 
 Some projects included on this repo gives a more insight on how to properly setup CRen, a simple HelloWorld with a minimum required setup, and a game engine that gets further used by an Editor.
 
+Also, CRen is currently designed to work on whatever platform Vulkan has support. As an example, project_android uses CRen and Engine to create a resistor calculator app.
+It's but a simple 2D application, but running using CRen and 3D projects are possible.
+
 
 ## Requirements and dependencies
 CRen is lightweight, only requiring essencial dependencies, all included and compiled into a static-library with CMake as it's building tool. Projects may use other dependencies and may be written in other programming languages (C++).
-* **CRen** (C11 Static-Library): Vulkan 1.1 API, Volk, Stb;
+* **CRen** (C11 Shared/Static-Library): Vulkan API, Stb;
 * **HelloWorld** (C11 ConsoleApp): **CRen**, GLFW; 
-* **Engine** (C++17 Static-Library): **CRen**, GLFW, ImGui, EnTT;
+* **Engine** (C++17 Shared-Library): **CRen**, SDL3, ImGui, EnTT;
 * **Editor** (C++17 ConsoleApp): **Engine**;
-
-*The user must also compile the shaders located on ```cren/data/shader``` into ```cren/data/shader/compiled``` with the same name and a .spv extension, this is to order to avoid any binary file in this repo. (windows: a bash script exists on the shader's folder to automate this if glslc is on environments variables)*
+* **Project Android** (C++17 SharedLib): **Engine**;
 
 ## License
 

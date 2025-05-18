@@ -58,6 +58,6 @@ namespace Cosmos
 	public:
 
 		// returns the transformation matrix
-		const mat4 GetTransform();
+		mat4 GetTransform();
 	};
 }

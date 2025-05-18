@@ -18,6 +18,7 @@ namespace Cosmos
             case LogSeverity::Todo: return "Todo";
             case LogSeverity::Info: return "Info";
             case LogSeverity::Warn: return "Warn";
+            case LogSeverity::Error: return "Error";
             case LogSeverity::Assert: return "Assert";
         }
         
@@ -43,6 +44,8 @@ namespace Cosmos
         oss << ": " << buffer;
 
         printf("%s\n", oss.str().c_str());
+
+        LoggerTracer::GetInstance().GetMessagesRef().push_back({ severity, oss.str() });
         #endif
     }
 
@@ -68,6 +71,14 @@ namespace Cosmos
 
         fprintf(f, "%s\n", oss.str().c_str());
         fclose(f);
+
+        LoggerTracer::GetInstance().GetMessagesRef().push_back({ severity, oss.str() });
         #endif
+    }
+
+    LoggerTracer& LoggerTracer::GetInstance()
+    {
+        static LoggerTracer instance;
+        return instance;
     }
 }

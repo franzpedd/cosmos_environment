@@ -9,9 +9,30 @@ namespace Cosmos
 	class Application 
 	{
 	public:
+
+		/// @brief requested information to properly initialize an application
+		struct CreateInfo
+		{
+			/// @brief this is the application name, used in the window as well as internally by the renderer
+			const char* appName = nullptr;
+
+			/// @brief tells the renderer we're going to create a customized viewport that is pottentially different than the one provided by cren (wich covers the entire window)
+			bool requestViewport = false;
+
+			/// @brief tells the window manager that the application will cover the entire window area
+			bool requestFullscreen = false;
+			
+			/// @brief tells the window manager it's width size, this can latter be changed
+			int width = 1366;
+
+			/// @brief tells the window manager it's height size, this can latter be changed
+			int height = 768;
+		};
+
+	public:
 	
 		/// @brief constructs and initializes the engine and it's core components
-		Application();
+		Application(const CreateInfo& ci);
 
 		/// @brief terminates and shutsdown the engine and it's core components
 		~Application();
@@ -64,6 +85,9 @@ namespace Cosmos
 
 		/// @brief this is called by the window, signaling the mouse was moved to a new location
 		void OnMouseMove(double xpos, double ypos);
+
+		/// @brief this is called by the window, the dots per inch has changed
+		void OnDPIChange(float scale);
 
 	protected:
 

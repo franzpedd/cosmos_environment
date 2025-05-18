@@ -2,7 +2,11 @@
 .build/
 .vs/
 .vscode/
-cren/data/shader/compiled/
 
 # extensions
-.spv/
+*.vcxproj
+*.vcxproj.user
+*.vcxproj.filters
+
+# android-specific
+project_android/.idea/

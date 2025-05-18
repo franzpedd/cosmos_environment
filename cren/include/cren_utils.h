@@ -1,6 +1,8 @@
 #ifndef CREN_UTILS_INCLUDED
 #define CREN_UTILS_INCLUDED
 
+#include "cren_defines.h"
+
 // functions
 #ifdef __cplusplus 
 extern "C" {
@@ -36,7 +38,7 @@ void crenmemory_zero(void* ptr, unsigned long long size);
 /// @param src where memory previously resided
 /// @param size how many bytes the memory occupies
 /// @return dest's address
-void* crenmemory_copy(void* dest, void* src, unsigned long long size);
+void* crenmemory_copy(void* dest, const void* src, unsigned long long size);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Dynamic array
@@ -52,62 +54,62 @@ typedef struct CRenArray
 /// @brief creates an array of data, the data should be managed outside the array struct/functions
 /// @param capacity initial capacity of the array, altough it is dynamic
 /// @return returns an array or NULL if couldn't be created
-CRenArray* crenarray_create(unsigned long long capacity);
+CREN_API CRenArray* crenarray_create(unsigned long long capacity);
 
 /// @brief destroys an array, but not it's contents
 /// @param arr the array to be destroyed
-void crenarray_destroy(CRenArray* arr);
+CREN_API void crenarray_destroy(CRenArray* arr);
 
 /// @brief resizes the array
 /// @param arr array to be resized
 /// @param newCapacity new size of the array
 /// @return 1 on success, 0 on failure
-int crenarray_resize(CRenArray* arr, unsigned long long newcapacity);
+CREN_API int crenarray_resize(CRenArray* arr, unsigned long long newcapacity);
 
 /// @brief pushes a new item at the back of the array
 /// @param arr array the item will be added to
 /// @param item the item to be added
 /// @return 1 on success, 0 on failure
-int crenarray_push_back(CRenArray* arr, void* item);
+CREN_API int crenarray_push_back(CRenArray* arr, void* item);
 
 /// @brief removes an item from the array's end
 /// @param arr the array the item will be removed
 /// @return the address to the removed item
-void* crenarray_pop_back(CRenArray* arr);
+CREN_API void* crenarray_pop_back(CRenArray* arr);
 
 /// @brief inserts a new item into a given position index within the array
 /// @param arr the array to add an item to
 /// @param index the position to be added
 /// @param item the item to be added
 /// @return 0 on failure, 1 on success
-int crenarray_insert_at(CRenArray* arr, unsigned long long index, void* item);
+CREN_API int crenarray_insert_at(CRenArray* arr, unsigned long long index, void* item);
 
 /// @brief deletes an item from a given position
 /// @param arr the array the the item will be removed
 /// @param index the index to remove the item from
 /// @return the removed item address or NULL if out of bounds
-void* crenarray_delete_from(CRenArray* arr, unsigned long long index);
+CREN_API void* crenarray_delete_from(CRenArray* arr, unsigned long long index);
 
 /// @brief returns the array's current size
 /// @param arr the array itself
 /// @return the array's size
-unsigned long long crenarray_size(const CRenArray* arr);
+CREN_API unsigned long long crenarray_size(const CRenArray* arr);
 
 /// @brief returns the array's current capacity
 /// @param arr the array itself
 /// @return the array's capacity
-unsigned long long crenarray_capacity(const CRenArray* arr);
+CREN_API unsigned long long crenarray_capacity(const CRenArray* arr);
 
 /// @brief function alike std::vector::data
 /// @param arr the array itself
 /// @return a ptr-to-ptrs of all items within the array
-void** crenarray_data(CRenArray* arr);
+CREN_API void** crenarray_data(CRenArray* arr);
 
 /// @brief returns the address to a given item at the given index
 /// @param array the array itself
 /// @param index the position desired
 /// @return the address of the given position or NULL if position is invalid
-void* crenarray_at(const CRenArray* array, unsigned long long index);
+CREN_API void* crenarray_at(const CRenArray* array, unsigned long long index);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Stacic Hashtable
@@ -125,7 +127,6 @@ typedef struct Hashtable
 {
     HashEntry* entries[CREN_HASHTABLE_MAXSIZE]; // prime numbers are excellent for hashing
 } Hashtable;
-
 
 /// @brief creates an emtpy hashtable
 /// @return the hashtable address

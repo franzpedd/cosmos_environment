@@ -1,77 +1,42 @@
 #ifndef CREN_PLATFORM_INCLUDED
 #define CREN_PLATFORM_INCLUDED
 
+#include "cren_defines.h"
 #include "cren_utils.h"
 
-#include <stdio.h>
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Various defines
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// @brief platform detection
-#ifdef _WIN32
-    #define PLATFORM_WINDOWS
-    #define VK_USE_PLATFORM_WIN32_KHR
-#elif defined(__APPLE__) && defined(__MACH__)
-    #define PLATFORM_APPLE
-    #define VK_USE_PLATFORM_METAL_EXT
-#elif defined(__ANDROID__)
-    #define PLATFORM_ANDROID
-    #define VK_USE_PLATFORM_ANDROID_KHR
-#elif defined(__linux__)
-	#if defined(__WAYLAND__)
-	    #define PLATFORM_WAYLAND
-        #define VK_USE_PLATFORM_WAYLAND_KHR
-	#elif defined(__X11__)
-	    #define PLATFORM_X11
-        #define VK_USE_PLATFORM_XLIB_KHR
-	#endif
-#else
-    #error "Unsupported platform"
-#endif
-
-#include <volk.h>
-
-/// @brief  align-as per compiler
-#if defined(_MSC_VER)
-    #define align_as(X) __declspec(align(X))
-#elif defined(__GNUC__) || defined(__clang__)
-    #define align_as(X) __attribute__((aligned(X)))
-#else
-    #include <stdalign.h>
-    #define align_as(X) _Alignas(X)
-#endif
-
-/// @brief returns an unsigned integer of a version, 0.1.2.325 as an example
-#define CREN_MAKE_VERSION(variant, major, minor, patch) ((((unsigned int)(variant)) << 29U) | (((unsigned int)(major)) << 22U) | (((unsigned int)(minor)) << 12U) | ((unsigned int)(patch)))
-
-/// @brief size of a static C-style array. don't use on pointers
-#define CREN_ARRAYSIZE(ARR) ((int)(sizeof(ARR) / sizeof(*(ARR))))     
-
-/// @brief how many frames are simultaneosly rendered (multi-buffering)
-#define CREN_CONCURRENTLY_RENDERED_FRAMES 2
-
-/// @brief how many characters a path may have
-#define CREN_PATH_MAX_SIZE 128
-
-/// @brief macro for "asserting"
-#ifdef NDEBUG
-#define CREN_ASSERT(condition, msg) ((void)0)
-#else
-#define CREN_ASSERT(condition, msg) do { if (!(condition)) { fprintf(stderr, "[Line: %d - File:%s] Assertion: %s : Message: %s\n", __LINE__, __FILE__ , #condition, msg); } } while (0);
-#endif
+/// @brief convenient macro around thread_local, since it's been renamed on C23
+//#define CRenThreadLocal _Thread_local
 
 #ifdef __cplusplus 
 extern "C" {
 #endif
+
+#ifdef PLATFORM_ANDROID
+
+#include <android/asset_manager.h>
+
+/// @brief called from Java-Side of things, sets up the assets manager, making it persistent accross shared libraries
+/// @return the address of the assets manager
+CREN_API AAssetManager* cren_android_assets_manager_get();
+
+/// @brief the android assets manager must be called from the Java-side, therefore this must be initialized from there, using this function
+/// @param manager the android asset manager used
+CREN_API void cren_android_assets_manager_init(void* manager);
+
+#endif
+
+/// @brief loads a file from a given path, cross-platform
+/// @param path the file's path on disk/archive
+/// @param outSize the file's content size in bytes
+/// @return the u8* data loaded from file or NULL if an error occurred
+CREN_API unsigned int* cren_load_file(const char* path, unsigned long long* outSize);
 
 /// @brief creates a window surface for the underneath window
 /// @param instance vulkan instance object
 /// @param surface output vulkan surface khr
 /// @param nativeWindow raw-ptr to the native window, like HWND
 /// @return 1 on success, 0 on failure
-int cren_surface_create(void* instance, void* surface, void* nativeWindow);
+CREN_API int cren_surface_create(void* instance, void* surface, void* nativeWindow);
 
 /// @brief formats a const char* with a disk address of a file, constructing it's path
 /// @param subpath the desired file path, like "Texture/Sky/left.png"
@@ -79,13 +44,13 @@ int cren_surface_create(void* instance, void* surface, void* nativeWindow);
 /// @param removeExtension if equals 1, removes the file extension
 /// @param output output string the filepath will be formated to
 /// @param outputSize the maximum characters output has, so it won't overflow
-void cren_get_path(const char* subpath, const char* assetsRoot, int removeExtension, char* output, size_t outputSize);
+CREN_API void cren_get_path(const char* subpath, const char* assetsRoot, int removeExtension, char* output, unsigned long long outputSize);
 
 /// @brief locks the in-context thread
-void cren_thread_lock();
+CREN_API void cren_thread_lock();
 
 /// @brief unlocks the in-context thread
-void cren_thread_unlock();
+CREN_API void cren_thread_unlock();
 
 /// @brief loads an image given a disk path using stb's library
 /// @param path image's disk path
@@ -94,11 +59,15 @@ void cren_thread_unlock();
 /// @param outHeight image's read height size
 /// @param outChannels image's read channels count
 /// @return the loaded image or NULL if an error has occured
-unsigned char* cren_stbimage_load_from_file(const char* path, int desiredChannels, int* outWidth, int* outHeight, int* outChannels);
+CREN_API unsigned char* cren_stbimage_load_from_file(const char* path, int desiredChannels, int* outWidth, int* outHeight, int* outChannels);
 
 /// @brief release the stb image previously created
 /// @param ptr image's address
-void cren_stbimage_destroy(unsigned char* ptr);
+CREN_API void cren_stbimage_destroy(unsigned char* ptr);
+
+/// @brief returns the last error from attempting to load image
+// @return the brief error message
+CREN_API const char* cren_stbimage_get_error();
 
 #ifdef __cplusplus 
 }

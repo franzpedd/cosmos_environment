@@ -1,29 +1,8 @@
 #include "ui/widget.h"
+#include "ui/wrapper_imgui.h"
 
-#define IMGUI_DEFINE_MATH_OPERATORS
-#include <imgui.h>
-#include <imgui_internal.h>
-
-namespace Cosmos::UI
+namespace Cosmos::WidgetExtended
 {
-	void Begin(const char* name, bool* open, int flags)
-	{
-		ImGui::Begin(name, open, (ImGuiWindowFlags)flags);
-	}
-
-	void End()
-	{
-		ImGui::End();
-	}
-
-	void Text(const char* fmt, ...)
-	{
-		va_list args;
-		va_start(args, fmt);
-		ImGui::TextV(fmt, args);
-		va_end(args);
-	}
-
 	void TextCentered(const char* fmt, ...)
 	{
 		auto windowWidth = ImGui::GetWindowSize().x;
@@ -36,14 +15,78 @@ namespace Cosmos::UI
 		va_end(args);
 	}
 
-	void Separator(int flags, float thickness)
+	void FloatControl(const char* label, float* value)
 	{
-		ImGui::SeparatorEx((ImGuiSeparatorFlags)flags, thickness);
+		ImGui::PushID(label);
+
+		constexpr ImVec4 colorX = ImVec4{ 0.8f, 0.1f, 0.15f, 1.0f };
+		constexpr ImVec4 colorY = ImVec4{ 0.25f, 0.7f, 0.2f, 1.0f };
+		constexpr ImVec4 colorZ = ImVec4{ 0.1f, 0.25f, 0.8f, 1.0f };
+
+		// x
+		{
+			ImGui::PushStyleColor(ImGuiCol_Button, colorX);
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colorX);
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive, colorX);
+
+			ImGui::SmallButton("X");
+			ImGui::SameLine();
+			ImGui::PushItemWidth(50);
+			ImGui::DragFloat("##X", value, 0.1f, 0.0f, 0.0f, "%.2f");
+			ImGui::SameLine();
+			ImGui::PopItemWidth();
+
+			ImGui::PopStyleColor(3);
+		}
+
+		ImGui::NewLine();
+
+		ImGui::PopID();
 	}
 
-	void SeparatorText(const char* txt)
+	void Float2Control(const char* label, float* x, float* y)
 	{
-		ImGui::SeparatorText(txt);
+		ImGui::PushID(label);
+
+		constexpr ImVec4 colorX = ImVec4{ 0.8f, 0.1f, 0.15f, 1.0f };
+		constexpr ImVec4 colorY = ImVec4{ 0.25f, 0.7f, 0.2f, 1.0f };
+		constexpr ImVec4 colorZ = ImVec4{ 0.1f, 0.25f, 0.8f, 1.0f };
+
+		// x
+		{
+			ImGui::PushStyleColor(ImGuiCol_Button, colorX);
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colorX);
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive, colorX);
+
+			ImGui::SmallButton("X");
+			ImGui::SameLine();
+			ImGui::PushItemWidth(50);
+			ImGui::DragFloat("##X", x, 0.1f, 0.0f, 0.0f, "%.2f");
+			ImGui::SameLine();
+			ImGui::PopItemWidth();
+
+			ImGui::PopStyleColor(3);
+		}
+
+		// y
+		{
+			ImGui::PushStyleColor(ImGuiCol_Button, colorY);
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colorY);
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive, colorY);
+
+			ImGui::SmallButton("Y");
+			ImGui::SameLine();
+			ImGui::PushItemWidth(50);
+			ImGui::DragFloat("##Y", y, 0.1f, 0.0f, 0.0f, "%.2f");
+			ImGui::SameLine();
+			ImGui::PopItemWidth();
+
+			ImGui::PopStyleColor(3);
+		}
+
+		ImGui::NewLine();
+
+		ImGui::PopID();
 	}
 
 	void Float3Controller(const char* label, float* x, float* y, float* z)
@@ -108,78 +151,22 @@ namespace Cosmos::UI
 		ImGui::PopID();
 	}
 
-	void Float2Control(const char* label, float* x, float* y)
+	void TextBackground(float4 bgCol, float4 txtCol, const char* label, const char* fmt, ...)
 	{
-		ImGui::PushID(label);
+		ImVec4 bg = ImVec4(bgCol.x, bgCol.y, bgCol.z, bgCol.w);
+		ImVec4 txt = ImVec4(txtCol.x, txtCol.y, txtCol.z, txtCol.w);
 
-		constexpr ImVec4 colorX = ImVec4{ 0.8f, 0.1f, 0.15f, 1.0f };
-		constexpr ImVec4 colorY = ImVec4{ 0.25f, 0.7f, 0.2f, 1.0f };
-		constexpr ImVec4 colorZ = ImVec4{ 0.1f, 0.25f, 0.8f, 1.0f };
+		ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(10.0f, 10.0f));
+		if (ImGui::BeginTable(label, 1, ImGuiTableFlags_Borders | ImGuiTableFlags_NoHostExtendX | ImGuiTableFlags_SizingFixedFit)) {
+			ImGui::TableNextRow();
+			ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32(bg));
+			ImGui::TableSetColumnIndex(0);
 
-		// x
-		{
-			ImGui::PushStyleColor(ImGuiCol_Button, colorX);
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colorX);
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, colorX);
+			ImGui::TextColored(txt, "%s", fmt);
 
-			ImGui::SmallButton("X");
-			ImGui::SameLine();
-			ImGui::PushItemWidth(50);
-			ImGui::DragFloat("##X", x, 0.1f, 0.0f, 0.0f, "%.2f");
-			ImGui::SameLine();
-			ImGui::PopItemWidth();
-
-			ImGui::PopStyleColor(3);
+			ImGui::EndTable();
 		}
-
-		// y
-		{
-			ImGui::PushStyleColor(ImGuiCol_Button, colorY);
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colorY);
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, colorY);
-
-			ImGui::SmallButton("Y");
-			ImGui::SameLine();
-			ImGui::PushItemWidth(50);
-			ImGui::DragFloat("##Y", y, 0.1f, 0.0f, 0.0f, "%.2f");
-			ImGui::SameLine();
-			ImGui::PopItemWidth();
-
-			ImGui::PopStyleColor(3);
-		}
-
-		ImGui::NewLine();
-
-		ImGui::PopID();
-	}
-
-	void FloatControl(const char* label, float* value)
-	{
-		ImGui::PushID(label);
-
-		constexpr ImVec4 colorX = ImVec4{ 0.8f, 0.1f, 0.15f, 1.0f };
-		constexpr ImVec4 colorY = ImVec4{ 0.25f, 0.7f, 0.2f, 1.0f };
-		constexpr ImVec4 colorZ = ImVec4{ 0.1f, 0.25f, 0.8f, 1.0f };
-
-		// x
-		{
-			ImGui::PushStyleColor(ImGuiCol_Button, colorX);
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colorX);
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, colorX);
-
-			ImGui::SmallButton("X");
-			ImGui::SameLine();
-			ImGui::PushItemWidth(50);
-			ImGui::DragFloat("##X", value, 0.1f, 0.0f, 0.0f, "%.2f");
-			ImGui::SameLine();
-			ImGui::PopItemWidth();
-
-			ImGui::PopStyleColor(3);
-		}
-
-		ImGui::NewLine();
-
-		ImGui::PopID();
+		ImGui::PopStyleVar();
 	}
 
 	bool Checkbox(const char* label, bool* v)
@@ -233,7 +220,8 @@ namespace Cosmos::UI
 		};
 
 		if (g.LogEnabled) {
-			ImGui::LogRenderedText(&text_bb.GetTL(), *v ? "[X]" : "[]");
+			ImVec2 text_pos = text_bb.GetTL();  // Store the temporary in a variable first
+			ImGui::LogRenderedText(&text_pos, *v ? "[X]" : "[]");
 		}
 		if (label_size.x > 0.0f) {
 			ImGui::RenderText(text_bb.GetTL(), label);
@@ -328,46 +316,5 @@ namespace Cosmos::UI
 
 		return pressed;
 	}
-
-	void ShowDemo()
-	{
-		ImGui::ShowDemoWindow();
-	}
-
-	void Dockspace(unsigned int id)
-	{
-		ImGui::DockSpace((ImGuiID)id);
-	}
 }
 
-namespace Cosmos::UI::Params
-{
-	void SetNextWindowPosition(float x, float y)
-	{
-		ImGui::SetNextWindowPos(ImVec2(x, y), 0);
-	}
-
-	void SetNextWindowSize(float x, float y)
-	{
-		ImGui::SetNextWindowSize(ImVec2(x, y));
-	}
-
-	void GetMainViewportSize(float* x, float* y)
-	{
-		const ImGuiViewport* viewport = ImGui::GetMainViewport();
-		*x = viewport->WorkSize.x;
-		*y = viewport->WorkSize.y;
-	}
-
-	void GetMainViewportPos(float* x, float* y)
-	{
-		const ImGuiViewport* viewport = ImGui::GetMainViewport();
-		*x = viewport->WorkPos.x;
-		*y = viewport->WorkPos.y;
-	}
-
-	unsigned int GetWidgetID(const char* str)
-	{
-		return ImGui::GetID(str);
-	}
-}

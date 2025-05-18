@@ -12,7 +12,7 @@ namespace Cosmos
     public:
 
         /// @brief initializes the renderer with standart configurations
-        Renderer(Application* app);
+        Renderer(Application* app, const char* appName, bool requestViewport);
 
         /// @brief shutsdown the renderer and release it's resources
         ~Renderer();
@@ -25,8 +25,19 @@ namespace Cosmos
         /// @brief updates the renderer, sending frame data to the gpu at a fixed period
         void OnUpdate(double timestep);
 
-        /// @brief 
+        /// @brief draw stuff
         void OnRender(double timestep);
+
+    public:
+
+        /// @brief tells the renderer to minimize
+        void Minimize();
+
+        /// @brief tells the renderer to restore it's last known window size
+        void Restore();
+
+        /// @brief tells the renderer to resize
+        void Resize(int width, int height);
 
     protected:
 

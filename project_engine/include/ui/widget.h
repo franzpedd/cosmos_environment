@@ -1,6 +1,10 @@
 #pragma once
 
 #include "core/input.h"
+#include <cren_math.h>
+
+#define IMGUI_DEFINE_MATH_OPERATORS
+#include <imgui.h>
 
 namespace Cosmos
 {
@@ -29,7 +33,7 @@ namespace Cosmos
 		inline virtual void OnUpdate() {};
 
 		// renderer drawing
-		inline virtual void OnRender() {};
+		inline virtual void OnRender(int stage) {};
 
 	public:
 
@@ -67,93 +71,94 @@ namespace Cosmos
 	};
 }
 
-namespace Cosmos::UI
+namespace Cosmos::WidgetExtended
 {
-	/// @brief starts a window context
-	/// @param name unique window name
-	/// @param open variable to address the window's visibility to
-	/// @param flags ImGuiWindowFlags equivalent
-	void Begin(const char* name, bool* open = nullptr, int flags = 0);
-
-	/// @brief ends the window context
-	void End();
-
-	/// @brief display unicode text
-	/// @param fmt va_args of the text
-	void Text(const char* fmt, ...);
-
-	/// @brief displays a text center-aligned
-	/// @param text the text to display
+	/// @brief centered text in the window
+	/// @param fmt va_arglist to format the text
 	void TextCentered(const char* fmt, ...);
 
-	/// @brief draws a separator
-	/// @param flags ImGuiSeparatorFlags equivalent
-	/// @param thickness the sperator's thickness
-	void Separator(int flags, float thickness = 1.0f);
+	/// @brief little hack that transforms a table into a text with colored background
+	/// @param bgCol the background color 0-255 for each value
+	/// @param txtCol the text color 0-255 for each value
+	/// @param label the text id/text
+	/// @param fmt va_arglist to format the text
+	void TextBackground(float4 bgCol, float4 txtCol, const char* label, const char* fmt, ...);
 
-	/// @brief draws a separator with a text in it
-	/// @param txt the text that'll apear in the separator
-	void SeparatorText(const char* txt);
-
-	/// @brief draws a 3 component float controller
-	/// @param label float's label/unique id
-	/// @param x the first value
-	/// @param y the second value
-	/// @param z the third value
-	void Float3Controller(const char* label, float* x, float* y, float* z);
-
-	/// @brief draws a 2 component float controller
-	/// @param label float's label/unique id
-	/// @param x the first value
-	/// @param y the second value
-	void Float2Control(const char* label, float* x, float* y);
-
-	/// @brief draws a float controller
-	/// @param label float label/unique id
-	/// @param value the controller's value
-	void FloatControl(const char* label, float* value);
-
-	/// @brief displays a checkbox field
-	/// @param label checkbox text to be displayed
-	/// @param v boolean value that refers the checkbox
+	/// @brief custom checkbox
+	/// @param label checkbox text
+	/// @param v controls the checkbox is on/off
+	/// @return true enabled, false on disabled
 	bool Checkbox(const char* label, bool* v);
 
-	/// @brief displays a checkbox slider field
-	/// @param label checkbox text to be displayed
-	/// @param v boolean value that refers the checkbox
+	/// @brief custom checkbox slider
+	/// @param label checkbox text
+	/// @param v controls the checkbox is on/off
+	/// @return true enabled, false on disabled
 	bool CheckboxSliderEx(const char* label, bool* v);
 
-	/// @brief displays the imgui window demo
-	void ShowDemo();
+	/// @brief custom float controller
+	/// @param label label control text
+	/// @param x controller value
+	void FloatControl(const char* label, float* value);
 
-	/// @brief enables dockspace on the current window, on the entire window area
-	/// @param id the dockspace's id
-	void Dockspace(unsigned int id);
+	/// @brief custom 2d float controller
+	/// @param label label control text
+	/// @param x first controller value
+	/// @param y second controller value
+	void Float2Control(const char* label, float* x, float* y);
+
+	/// @brief custom 3d float controller
+	/// @param label label control text
+	/// @param x first controller value
+	/// @param y second controller value
+	/// @param z third controller value
+	void Float3Controller(const char* label, float* x, float* y, float* z);
 }
 
-namespace Cosmos::UI::Params
+namespace Cosmos::WidgetUtils
 {
-	/// @brief sets the next window's position
-	/// @param x x-axis coordinate
-	/// @param y y-axis coordinate
-	void SetNextWindowPosition(float x, float y);
+	class CenteredControlWrapper {
+	public:
+		explicit CenteredControlWrapper(bool result) : result_(result) {}
 
-	/// @brief sets the next window's size
-	/// @param x width 
-	/// @param y height
-	void SetNextWindowSize(float x, float y);
+		operator bool() const {
+			return result_;
+		}
 
-	/// @brief returns the main viewport size
-	/// @param x viewport's width
-	/// @param y viewport's height
-	void GetMainViewportSize(float* x, float* y);
+	private:
+		bool result_;
+	};
 
-	/// @brief returns the main viewport position
-	/// @param x viewport's x position
-	/// @param y viewport's y position
-	void GetMainViewportPos(float* x, float* y);
+	class ControlCenterer {
+	public:
+		ControlCenterer(ImVec2 windowSize) : windowSize_(windowSize) {}
 
-	/// @returns an id given the unique string of a widget
-	/// @param str the unique window's string/name
-	unsigned int GetWidgetID(const char* str);
+		template<typename Func>
+		CenteredControlWrapper operator()(Func control) const {
+			
+			ImVec2 originalPos = ImGui::GetCursorPos();
+
+			// Draw offscreen to calculate size
+			ImGui::SetCursorPos(ImVec2(-10000.0f, -10000.0f));
+
+			ImGui::PushID(this);
+			control();
+			ImGui::PopID();
+
+			ImVec2 controlSize = ImGui::GetItemRectSize();
+
+			// Draw at centered position
+			ImGui::SetCursorPos(ImVec2((windowSize_.x - controlSize.x) * 0.5f, originalPos.y));
+
+			control();
+
+			return CenteredControlWrapper(ImGui::IsItemClicked());
+		}
+
+	private:
+		ImVec2 windowSize_;
+	};
+
+#define CENTERED_CONTROL(control) Cosmos::WidgetUtils::ControlCenterer { ImGui::GetWindowSize() }([&]() { control; } )
+
 }

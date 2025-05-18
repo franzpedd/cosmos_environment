@@ -9,24 +9,23 @@ namespace Cosmos::Editor
 
     void Dockspace::OnUpdate()
     {
-		float2 position = {};
-		UI::Params::GetMainViewportPos(&position.x, &position.y);
+		ImVec2 position = ImGui::GetMainViewport()->Pos;
 
-		float2 size = {};
-		UI::Params::GetMainViewportSize(&size.x, &size.y);
+		ImVec2 size = ImGui::GetMainViewport()->Size;
 
-		UI::Params::SetNextWindowPosition(position.x, position.y);
-		UI::Params::SetNextWindowSize(size.x, size.y);
+		ImGui::SetNextWindowPos(position);
+		ImGui::SetNextWindowSize(size);
+			
+		ImGui::Begin("Dockspace", 0, ImGuiWindowFlags_NoResize 
+			| ImGuiWindowFlags_NoResize
+			| ImGuiWindowFlags_NoMove
+			| ImGuiWindowFlags_NoCollapse
+			| ImGuiWindowFlags_NoBringToFrontOnFocus
+			| ImGuiWindowFlags_NoNavFocus
+		);
 
-		int flags = 1;		// ImGuiWindowFlags_NoTitleBar
-		flags |= 2;			// ImGuiWindowFlags_NoResize
-		flags |= 4;			// ImGuiWindowFlags_NoMove
-		flags |= 32;		// ImGuiWindowFlags_NoCollapse
-		flags |= 8192;		// ImGuiWindowFlags_NoBringToFrontOnFocus
-		flags |= 131072;	// ImGuiWindowFlags_NoNavFocus
+		ImGui::DockSpace(ImGui::GetID("MyDockspace"));
 
-		UI::Begin("Dockspace", 0, flags);
-		UI::Dockspace(UI::Params::GetWidgetID("MyDockSpace"));
-		UI::End();
+		ImGui::End();
     }
 }

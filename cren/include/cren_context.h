@@ -2,6 +2,13 @@
 #define CREN_CONTEXT_INCLUDED
 
 #include "cren_camera.h"
+#include "cren_defines.h"
+
+/// @brief a list of render stages the frame may be
+typedef enum {
+    Default = 0,
+    Picking
+} CRenRenderStage;
 
 /// @brief used for creating the cren context, specifies various details about the cren graphics context. They may however, latter be modified by functions
 typedef struct {
@@ -20,7 +27,7 @@ typedef struct {
 
 /// @brief holds all current state about the cren context, like camera, renderer's backend, userpointer
 typedef struct {
-    CRenCreateInfo* createInfo;
+    CRenCreateInfo createInfo;
     CRenCamera camera;
     void* backend;
     
@@ -39,35 +46,35 @@ extern "C" {
 /// @brief creates the cren context, initializing the library
 /// @param createInfo the address of a create info specification
 /// @return the cren context or NULL if failed
-CRenContext* cren_initialize(CRenCreateInfo* createInfo);
+CREN_API CRenContext* cren_initialize(CRenCreateInfo createInfo);
 
 /// @brief shutdown all cren components and objects
 /// @param context cren context memory address
-void cren_terminate(CRenContext* context);
+CREN_API void cren_terminate(CRenContext* context);
 
 /// @brief updates the renderer frame, sending information to be processed by the gpu
 /// @param context cren context memory address
 /// @param timestep interpolation step, time betweent last and current frame
-void cren_update(CRenContext* context, double timestep);
+CREN_API void cren_update(CRenContext* context, double timestep);
 
 /// @brief performs the frame rendering, setting-up all resources required for drawing the current frame and presenting the previously rendered
 /// @param context cren context memory address
 /// @param timestep interpolation step, time betweent last and current frame
-void cren_render(CRenContext* context, double timestep);
+CREN_API void cren_render(CRenContext* context, double timestep);
 
 /// @brief resizes the renderer, call this on every window resize event
 /// @param context cren context memory address
 /// @param width new width
 /// @param height new height
-void cren_resize(CRenContext* context, int width, int height);
+CREN_API void cren_resize(CRenContext* context, int width, int height);
 
 /// @brief minimizes the renderer, stopping rendering without staling it
 /// @param context cren context memory address
-void cren_minimize(CRenContext* context);
+CREN_API void cren_minimize(CRenContext* context);
 
 /// @brief restores the renderer to it's last known size, resuming the rendering process
 /// @param context cren context memory address
-void cren_restore(CRenContext* context);
+CREN_API void cren_restore(CRenContext* context);
 
 #ifdef __cplusplus 
 }

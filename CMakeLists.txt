@@ -9,10 +9,13 @@ project(CRen VERSION 1.0 LANGUAGES C)
 add_subdirectory(cren)
 
 if(BUILD_PROJECTS)
+    # dependencies first
+    add_subdirectory(project_thirdparty/glfw)
+    add_subdirectory(project_thirdparty/sdl)
+
     add_subdirectory(project_helloworld)
     add_subdirectory(project_engine)
     add_subdirectory(project_editor)
     
-    add_subdirectory(project_thirdparty/glfw)
-    add_subdirectory(project_thirdparty/imgui)
+    
 endif()

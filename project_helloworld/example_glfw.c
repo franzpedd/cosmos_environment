@@ -17,7 +17,7 @@
 static CRenContext* sContext = NULL;
 
 // required cren callback, it signals the user when it's time to draw objects so the user can manager how and what to draw
-static void render_callback(CRenContext* context, int stage, double timestep) {}
+static void render_callback(CRenContext* context, CRenRenderStage stage, double timestep) {}
 
 // optional cren callback, it signals the user when 
 static void resize_callback(CRenContext* context, unsigned int width, unsigned int height) {}
@@ -76,7 +76,7 @@ int main(int arg, char** argv) {
     CRenCreateInfo ci = { 0 };
     ci.appName = title;                             // the application name
     ci.appVersion = CREN_MAKE_VERSION(0, 1, 0, 0);  // the application version
-    ci.assetsRoot = "../data";                      // must be the path the folder shaders resides (CMake puts it into the compiled binary folder (folder previous to Debug/Release))
+    ci.assetsRoot = "data";                         // must be the path the folder shaders resides (CMake puts it into the compiled binary folder (folder previous to Debug/Release))
     ci.apiVersion = CREN_MAKE_VERSION(0, 1, 0, 2);  // desired vulkan api version
     ci.validations = 1;                             // enables the vulkan message errors
     ci.vsync = 0;                                   // vertical syncronization disabled, rendering either triple-buffering(if available) or as fast as possible
@@ -87,7 +87,7 @@ int main(int arg, char** argv) {
     ci.nativeWindow = glfwGetWin32Window(window);   // ptr to the window object so a window-surface may be created for that window in particular, in this case a HWND
 
     // initialize the CRen
-    sContext = cren_initialize(&ci);
+    sContext = cren_initialize(ci);
     if (!sContext) {
         printf("Could not initialize CRen\n");
         return 0;
@@ -115,7 +115,7 @@ int main(int arg, char** argv) {
         glfwPollEvents(); // process window events
 
         // clamp timestep to prevent spiral of death
-        timeStep = d_min(timeStep, 0.1); // max 100ms
+        timeStep = (double)f_min(timeStep, 0.1); // max 100ms
         accumulator += timeStep;
 
         int updateCount = 0;

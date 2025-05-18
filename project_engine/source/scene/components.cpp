@@ -6,6 +6,7 @@
 namespace Cosmos
 {
 	IDComponent::IDComponent()
+		: id(0)
 	{
 		COSMOS_LOG(LogSeverity::Todo, "Create id");
 	}
@@ -48,8 +49,8 @@ namespace Cosmos
 		}
 	}
 
-	TransformComponent::TransformComponent(float3 translation, float3 rotation, float3 scale) 
-		: translation(translation), rotation(rotation), scale(scale) 
+	TransformComponent::TransformComponent(float3 translation, float3 rotation, float3 scale)
+		: translation(translation), rotation(rotation), scale(scale)
 	{
 	}
 
@@ -91,22 +92,13 @@ namespace Cosmos
 		}
 	}
 
-	//glm::mat4 rot = glm::toMat4(glm::quat(rotation));
-	//glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), translation) * rot * glm::scale(glm::mat4(1.0f), scale);
-	//return modelMatrix;
-	const mat4 TransformComponent::GetTransform()
+	mat4 TransformComponent::GetTransform()
 	{
-		mat4 rotationMat;
-		Quat q = yaw_pitch_roll(rotation.y, rotation.x, rotation.z);
-		quat_to_mat4(&q, &rotationMat);
+		quat q = quat_from_euler({ to_radians(rotation.x), to_radians(rotation.y), to_radians(rotation.z) });
+		mat4 rmat = mat4_from_quat(q);
+		mat4 smat = mat4_scale(mat4_identity(), { scale.x, scale.y, scale.z });
+		mat4 tmat = mat4_translate(mat4_identity(), { translation.x, translation.y, translation.z });
 
-		mat4 translationMat;
-		mat4_translate(&translationMat, translation.x, translation.y, translation.z);
-
-		mat4 scaleMat;
-		mat4_scale(&scaleMat, scale.x, scale.y, scale.z);
-
-		mat4 temp = mat4_mul(&translationMat, &rotationMat);
-		return mat4_mul(&temp, &scaleMat);
+		return mat4_mul(smat, mat4_mul(rmat, tmat)); // scale × (rotate × translate) // (Row-Major)
 	}
 }

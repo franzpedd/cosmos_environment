@@ -3,7 +3,7 @@
 #include "core/input.h"
 
 // forward declarations
-struct GLFWwindow;
+struct SDL_Window;
 namespace Cosmos { class Application; }
 
 namespace Cosmos
@@ -13,13 +13,13 @@ namespace Cosmos
 	public:
 
 		/// @brief constructs the window and set's up it's resources 
-		Window(Application* app, const char* title, int width, int height);
+		Window(Application* app, const char* title, int width, int height, bool fullscreen);
 
 		/// @brief shutsdown the window and it's resources
 		~Window();
 
 		/// @brief returns the window's underneath raw pointer, casted as void* so unnecessary includes can be avoided
-		inline GLFWwindow* GetGLFWWindow() { return mNativeWindow; }
+		inline SDL_Window* GetAPIWindow() { return mNativeWindow; }
 
 		/// @brief returns the window's width
 		inline const int GetWidth() const { return mWidth; }
@@ -60,7 +60,7 @@ namespace Cosmos
 		void GetWindowSize(int* outWidth, int* outHeight);
 
 		/// @brief returns the cursor position, relative to the window's size
-		void GetCursorPosition(double* outX, double* outY);
+		void GetCursorPosition(float* outX, float* outY);
 
 		/// @brief returns the cursor position, relative to a custom viewport/framebuffer specified
 		void GetViewportCursorPosition(const double vpPositionX, const double vpPositionY, const double vpSizeX, const double vpSizeY, double* outX, double* outY);
@@ -71,7 +71,7 @@ namespace Cosmos
 	protected:
 
 		Application* mApp;
-		GLFWwindow* mNativeWindow = nullptr; // glfw's window is underneath this void*
+		SDL_Window* mNativeWindow = nullptr; // SDL's window is underneath this void*
 		const char* mTitle;
 		int mWidth;
 		int mHeight;

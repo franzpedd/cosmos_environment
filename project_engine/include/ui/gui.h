@@ -25,7 +25,7 @@ namespace Cosmos
         void OnUpdate();
 
         /// @brief called when rendering the ui widgets
-        void OnRender();
+        void OnRender(int stage);
 
 		/// @brief adds a new widget to the widgets list
 		void AddWidget(Widget* widget);
@@ -67,6 +67,9 @@ namespace Cosmos
 		/// @brief this is called by the window, signaling the mouse was moved to a new location
 		void OnMouseMove(double xpos, double ypos);
 
+		/// @brief this is called by the window, the dots per inch has changed
+		void OnDPIChange(float scale);
+
 	public:
 
 		/// @brief informs the ui-backend that the quantity of images in the swapchain has changed
@@ -84,5 +87,6 @@ namespace Cosmos
 
 		Application* mApp;
 		Stack<Widget*> mWidgets;
+		void* mContext;
     };
 }

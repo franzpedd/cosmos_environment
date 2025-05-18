@@ -2,6 +2,7 @@
 
 #include "cren_callback.h"
 #include "cren_context.h"
+#include "cren_error.h"
 #include "cren_math.h"
 #include "cren_utils.h"
 
@@ -17,22 +18,22 @@
 /// @return false uppon handled severities, true otherwise
 static VKAPI_ATTR VkBool32 VKAPI_CALL internal_crenvk_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT* callback, void* userData) {
     if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-        fprintf(stderr, "%s\n", callback->pMessage);
+        CREN_LOG("%s\n", callback->pMessage);
         return VK_FALSE;
     }
 
     if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-        fprintf(stderr, "%s\n", callback->pMessage);
+        CREN_LOG("%s\n", callback->pMessage);
         return VK_FALSE;
     }
 
     if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
-        fprintf(stderr, "%s\n", callback->pMessage);
+        CREN_LOG("%s\n", callback->pMessage);
         return VK_FALSE;
     }
 
     if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
-        fprintf(stderr, "%s\n", callback->pMessage);
+        CREN_LOG("%s\n", callback->pMessage);
         return VK_FALSE;
     }
 
@@ -44,20 +45,22 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL internal_crenvk_debug_callback(VkDebugUtil
 /// @return the array with all extensions required
 static CRenArray* cren_get_required_instance_extensions(int validations) {
     CRenArray* extensions = crenarray_create(6);
-    if (!extensions) return NULL;
+    if (!extensions) {
+        return NULL;
+    }
 
     crenarray_push_back(extensions, VK_KHR_SURFACE_EXTENSION_NAME);
 #if defined(PLATFORM_WINDOWS)
-    crenarray_push_back(extensions, VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+    crenarray_push_back(extensions, "VK_KHR_win32_surface");
 #elif defined(PLATFORM_APPLE)
-    crenarray_push_back(extensions, VK_EXT_METAL_SURFACE_EXTENSION_NAME);
+    crenarray_push_back(extensions, "VK_EXT_metal_surface");
     crenarray_push_back(extensions, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
 #elif defined(PLATFORM_ANDROID)
-    crenarray_push_back(extensions, VK_KHR_ANDROID_SURFACE_EXTENSION_NAME);
+    crenarray_push_back(extensions, "VK_KHR_android_surface");
 #elif defined(PLATFORM_WAYLAND)
-    crenarray_push_back(extensions, VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME);
+    crenarray_push_back(extensions, "VK_KHR_wayland_surface");
 #elif defined(PLATFORM_X11)
-    crenarray_push_back(extensions, VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
+    crenarray_push_back(extensions, "VK_KHR_xlib_surface");
 #endif
 
     crenarray_push_back(extensions, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
@@ -70,6 +73,52 @@ static CRenArray* cren_get_required_instance_extensions(int validations) {
     return extensions;
 }
 
+void print_available_instance_extensions() {
+    uint32_t extensionCount = 0;
+
+    // 1. Get extension count
+    VkResult result = vkEnumerateInstanceExtensionProperties(NULL, &extensionCount, NULL);
+    if (result != VK_SUCCESS) {
+        CREN_LOG("Failed to get instance extension count: %d", result);
+        return;
+    }
+
+    // 2. Allocate memory for extensions
+    VkExtensionProperties* extensions = (VkExtensionProperties*)crenmemory_allocate(extensionCount * sizeof(VkExtensionProperties), 1);
+    if (!extensions) {
+        CREN_LOG("Failed to allocate memory for extensions");
+        return;
+    }
+
+    // 3. Fetch extension details
+    result = vkEnumerateInstanceExtensionProperties(NULL, &extensionCount, extensions);
+    if (result != VK_SUCCESS) {
+        CREN_LOG("Failed to enumerate instance extensions: %d", result);
+        crenmemory_deallocate(extensions);
+        return;
+    }
+
+    // 4. Print all available extensions
+    CREN_LOG("Available Vulkan Instance Extensions (%d):\n", extensionCount);
+    for (uint32_t i = 0; i < extensionCount; i++) {
+        CREN_LOG("- %s (version %u) \n", extensions[i].extensionName, extensions[i].specVersion);
+    }
+
+    crenmemory_deallocate(extensions);
+}
+
+void print_cren_array_strings(const CRenArray* array) {
+    for (unsigned long long i = 0; i < array->size; ++i) {
+        const char* str = (const char*)array->data[i];
+        if (str) {
+            CREN_LOG("Element %llu: %s\n", i, str);
+        }
+        else {
+            CREN_LOG("Element %llu: (null)\n", i);
+        }
+    }
+}
+
 /// @brief creates a vulkan instance and a vulkan debug utils messenger if validations are requested
 /// @param appName application's name
 /// @param appVersion application's version
@@ -77,14 +126,12 @@ static CRenArray* cren_get_required_instance_extensions(int validations) {
 /// @param validations request the api validaions or not
 /// @return 1 on success, 0 on failure
 static int internal_crenvk_instance_create(vkInstance* instance, const char* appName, unsigned int appVersion, unsigned int apiVersion, int validations) {
+
+    
     CRenArray* extensions = cren_get_required_instance_extensions(validations);
-    CRenArray* validationLayers = crenarray_create(1);
-    crenarray_push_back(validationLayers, "VK_LAYER_KHRONOS_validation");
+    print_cren_array_strings(extensions);
 
-    // initialize volk
-    if(volkInitialize() != VK_SUCCESS) return 0;
-
-    // initialize application info
+    print_available_instance_extensions();
     VkApplicationInfo appInfo = { 0 };
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = appName;
@@ -93,58 +140,80 @@ static int internal_crenvk_instance_create(vkInstance* instance, const char* app
     appInfo.engineVersion = appVersion;
     appInfo.apiVersion = apiVersion;
 
-    // initialize instance create info
     VkInstanceCreateInfo instanceCI = { 0 };
     instanceCI.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     instanceCI.pApplicationInfo = &appInfo;
-    instanceCI.enabledExtensionCount = (unsigned int)crenarray_size(extensions);
+    instanceCI.enabledExtensionCount = (uint32_t)crenarray_size(extensions);
     instanceCI.ppEnabledExtensionNames = (const char* const*)crenarray_data(extensions);
-#ifdef PLATFORM_APPLE
+    instanceCI.enabledLayerCount = 0;
+    instanceCI.ppEnabledLayerNames = NULL;
+    #ifdef PLATFORM_APPLE
     instanceCI.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-#endif
+    #endif
 
-    // enable validation layers if requested
-    VkDebugUtilsMessengerCreateInfoEXT debugCI = { 0 };
-    if (validations) {
-        debugCI.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-        debugCI.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-        debugCI.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-        debugCI.pfnUserCallback = internal_crenvk_debug_callback;
-        instanceCI.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCI;
-        instanceCI.enabledLayerCount = (unsigned int)crenarray_size(validationLayers);
-        instanceCI.ppEnabledLayerNames = (const char* const*)crenarray_data(validationLayers);
-    }
-
-    if(vkCreateInstance(&instanceCI, NULL, &instance->instance) != VK_SUCCESS) return 0;
-
-    // load instance
-    volkLoadInstance(instance->instance);
-
-    // create debugger
-    if (validations) {
-        if(vkCreateDebugUtilsMessengerEXT(instance->instance, &debugCI, NULL, &instance->debugger) != VK_SUCCESS) {
+    CREN_LOG("Creating Vulkan instance (without validations)...");
+    VkResult result = vkCreateInstance(&instanceCI, NULL, &instance->instance);
+    if (result != VK_SUCCESS) {
+        CREN_LOG("Failed to create instance (error %d). Trying fallback to Vulkan version 1.0", result);
+        appInfo.apiVersion = VK_API_VERSION_1_0;
+        result = vkCreateInstance(&instanceCI, NULL, &instance->instance);
+        if (result != VK_SUCCESS) {
+            cren_set_error(Vulkan_InstanceCreationFailed);
             crenarray_destroy(extensions);
-            crenarray_destroy(validationLayers);
-            vkDestroyInstance(instance->instance, NULL);
-            volkFinalize();
-
             return 0;
         }
     }
 
-    // free used resources
-    crenarray_destroy(extensions);
-    crenarray_destroy(validationLayers);
+    if (validations) {
+        uint32_t layerCount = 0;
+        vkEnumerateInstanceLayerProperties(&layerCount, NULL);
+        VkLayerProperties* layers = crenmemory_allocate(sizeof(VkLayerProperties) * layerCount, 1);
 
+        vkEnumerateInstanceLayerProperties(&layerCount, layers);
+
+        const char* validationLayerName = "VK_LAYER_KHRONOS_validation";
+        int hasValidationLayer = 0;
+        for (uint32_t i = 0; i < layerCount; i++) {
+            if (cren_strcmp(layers[i].layerName, validationLayerName) == 0) {
+                hasValidationLayer = 1;
+                break;
+            }
+        }
+        crenmemory_deallocate(layers);
+
+        if (hasValidationLayer) {
+            VkDebugUtilsMessengerCreateInfoEXT debugCI = { 0 };
+            debugCI.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+            debugCI.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
+            debugCI.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+            debugCI.pfnUserCallback = internal_crenvk_debug_callback;
+
+            PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance->instance, "vkCreateDebugUtilsMessengerEXT");
+            if (vkCreateDebugUtilsMessengerEXT) {
+                if (vkCreateDebugUtilsMessengerEXT(instance->instance, &debugCI, NULL, &instance->debugger) != VK_SUCCESS) {
+                    CREN_LOG("Failed to create debug messenger (ignoring)");
+                }
+            }
+            else {
+                CREN_LOG("Debug utils extension not available");
+            }
+        }
+        else {
+            CREN_LOG("Validation layer not available");
+        }
+    }
+
+    crenarray_destroy(extensions);
     return 1;
 }
 
-/// @brief destroys the vulkan instance and shutsdown volk
+/// @brief destroys the vulkan instance
 /// @param instance address of the vkInstance object
 static void internal_crenvk_instance_destroy(vkInstance* instance) {
+    PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance->instance, "vkDestroyDebugUtilsMessengerEXT");
+
     if (instance->debugger) vkDestroyDebugUtilsMessengerEXT(instance->instance, instance->debugger, NULL);
     if (instance->instance) vkDestroyInstance(instance->instance, NULL);
-    volkFinalize();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -183,7 +252,7 @@ static vkQueueFamilyIndices internal_crenvk_find_queue_families(VkPhysicalDevice
     unsigned int queue_family_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, NULL);
 
-    VkQueueFamilyProperties* queue_families = crenmemory_allocate(queue_family_count * sizeof(VkQueueFamilyProperties), 1);
+    VkQueueFamilyProperties* queue_families = (VkQueueFamilyProperties*)crenmemory_allocate(queue_family_count * sizeof(VkQueueFamilyProperties), 1);
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, queue_families);
 
     for (unsigned int i = 0; i < queue_family_count; i++) {
@@ -225,7 +294,7 @@ static int internal_crenvk_check_device_extension_support(VkPhysicalDevice devic
     unsigned int available_extension_count;
     vkEnumerateDeviceExtensionProperties(device, NULL, &available_extension_count, NULL);
 
-    VkExtensionProperties* available_extensions = crenmemory_allocate(available_extension_count * sizeof(VkExtensionProperties), 1);
+    VkExtensionProperties* available_extensions = (VkExtensionProperties*)crenmemory_allocate(available_extension_count * sizeof(VkExtensionProperties), 1);
     vkEnumerateDeviceExtensionProperties(device, NULL, &available_extension_count, available_extensions);
 
     for (unsigned int i = 0; i < extension_count; i++) {
@@ -256,7 +325,7 @@ static VkPhysicalDevice internal_crenvk_choose_physical_device(VkInstance instan
     unsigned int gpus = 0;
     vkEnumeratePhysicalDevices(instance, &gpus, NULL);
 
-    VkPhysicalDevice* devices = crenmemory_allocate(gpus * sizeof(VkPhysicalDevice), 1);
+    VkPhysicalDevice* devices = (VkPhysicalDevice*)crenmemory_allocate(gpus * sizeof(VkPhysicalDevice), 1);
     vkEnumeratePhysicalDevices(instance, &gpus, devices);
 
     VkPhysicalDevice choosenOne = VK_NULL_HANDLE;
@@ -281,7 +350,7 @@ static VkPhysicalDevice internal_crenvk_choose_physical_device(VkInstance instan
         VkDeviceSize currentScore = 0;
         if (device_props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) currentScore += 1000;  // discrete gpu
         currentScore += device_props.limits.maxImageDimension2D;                                    // max texture size
-        for (unsigned int j = 0; j < mem_props.memoryHeapCount; j++) {                                  // prefer devices with dedicated VRAM
+        for (unsigned int j = 0; j < mem_props.memoryHeapCount; j++) {                              // prefer devices with dedicated VRAM
             if (mem_props.memoryHeaps[j].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
                 currentScore += mem_props.memoryHeaps[j].size / (VkDeviceSize)(1024 * 1024);        // mb
             }
@@ -342,7 +411,7 @@ static int internal_crenvk_create_logical_device(VkPhysicalDevice physicalDevice
     #endif
 
     // required features
-    VkPhysicalDeviceFeatures deviceFeatures = {0};
+    VkPhysicalDeviceFeatures deviceFeatures = { 0 };
     deviceFeatures.shaderInt64 = VK_TRUE;
     deviceFeatures.samplerAnisotropy = VK_TRUE;
 
@@ -390,11 +459,15 @@ static int internal_crenvk_create_logical_device(VkPhysicalDevice physicalDevice
 /// @return 1 on success, 0 on failure
 static int internal_crenvk_device_create(CRenVulkanBackend* backend, void* nativeWindow, int validations) {
 
-    if (cren_surface_create(backend->instance.instance, &backend->device.surface, nativeWindow) != 1) return 0;
+    if (cren_surface_create(backend->instance.instance, &backend->device.surface, nativeWindow) != 1) {
+        cren_set_error(Vulkan_SurfaceCreationFailed);
+        return 0;
+    }
 
     backend->device.physicalDevice = internal_crenvk_choose_physical_device(backend->instance.instance, backend->device.surface);
 
     if (!backend->device.physicalDevice) {
+        cren_set_error(Vulkan_PhysicalDeviceUnfit);
         vkDestroySurfaceKHR(backend->instance.instance, backend->device.surface, NULL);
         return 0;
     }
@@ -405,6 +478,7 @@ static int internal_crenvk_device_create(CRenVulkanBackend* backend, void* nativ
 
     // create logical device
     if(internal_crenvk_create_logical_device(backend->device.physicalDevice, backend->device.surface, &backend->device.device, &backend->device.graphicsQueue, &backend->device.presentQueue, &backend->device.computeQueue, validations) != 1) {
+        cren_set_error(Vulkan_DeviceCreationFailed);
         vkDestroySurfaceKHR(backend->instance.instance, backend->device.surface, NULL);
         return 0;
     }
@@ -420,14 +494,23 @@ static int internal_crenvk_device_create(CRenVulkanBackend* backend, void* nativ
     fenceCI.pNext = NULL;
     fenceCI.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    backend->device.imageAvailableSemaphores = crenmemory_allocate(sizeof(VkSemaphore) * CREN_CONCURRENTLY_RENDERED_FRAMES, 1);
-    backend->device.finishedRenderingSemaphores = crenmemory_allocate(sizeof(VkSemaphore) * CREN_CONCURRENTLY_RENDERED_FRAMES, 1);
-    backend->device.framesInFlightFences = crenmemory_allocate(sizeof(VkFence) * CREN_CONCURRENTLY_RENDERED_FRAMES, 1);
+    backend->device.imageAvailableSemaphores = (VkSemaphore*)crenmemory_allocate(sizeof(VkSemaphore) * CREN_CONCURRENTLY_RENDERED_FRAMES, 1);
+    backend->device.finishedRenderingSemaphores = (VkSemaphore*)crenmemory_allocate(sizeof(VkSemaphore) * CREN_CONCURRENTLY_RENDERED_FRAMES, 1);
+    backend->device.framesInFlightFences = (VkFence*)crenmemory_allocate(sizeof(VkFence) * CREN_CONCURRENTLY_RENDERED_FRAMES, 1);
 
     for (size_t i = 0; i < CREN_CONCURRENTLY_RENDERED_FRAMES; i++) {
-        if (vkCreateSemaphore(backend->device.device, &semaphoreCI, NULL, &backend->device.imageAvailableSemaphores[i]) != VK_SUCCESS) return 0;
-        if (vkCreateSemaphore(backend->device.device, &semaphoreCI, NULL, &backend->device.finishedRenderingSemaphores[i]) != VK_SUCCESS) return 0;
-        if (vkCreateFence(backend->device.device, &fenceCI, NULL, &backend->device.framesInFlightFences[i]) != VK_SUCCESS) return 0;
+        if (vkCreateSemaphore(backend->device.device, &semaphoreCI, NULL, &backend->device.imageAvailableSemaphores[i]) != VK_SUCCESS) {
+            cren_set_error(Vulkan_SemaphoreCreationFailed);
+            return 0;
+        }
+        if (vkCreateSemaphore(backend->device.device, &semaphoreCI, NULL, &backend->device.finishedRenderingSemaphores[i]) != VK_SUCCESS) {
+            cren_set_error(Vulkan_SemaphoreCreationFailed);
+            return 0;
+        }
+        if (vkCreateFence(backend->device.device, &fenceCI, NULL, &backend->device.framesInFlightFences[i]) != VK_SUCCESS) {
+            cren_set_error(Vulkan_FenceCreationFailed);
+            return 0;
+        }
     }
     
     return 1;
@@ -459,7 +542,7 @@ static void internal_crenvk_device_destroy(vkInstance* instance, vkDevice* devic
 }
 
 int crenvk_device_create_buffer(VkDevice device, VkPhysicalDevice physicalDevice, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkDeviceSize size, VkBuffer* buffer, VkDeviceMemory *memory, void *data) {
-    VkBufferCreateInfo bufferCI = {0};
+    VkBufferCreateInfo bufferCI = { 0 };
     bufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferCI.size = size;
     bufferCI.usage = usage;
@@ -468,7 +551,7 @@ int crenvk_device_create_buffer(VkDevice device, VkPhysicalDevice physicalDevice
         return 0;
     }
 
-    VkMemoryRequirements memRequirements = {0};
+    VkMemoryRequirements memRequirements = { 0 };
     vkGetBufferMemoryRequirements(device, *buffer, &memRequirements);
 
     // allocate memory for the buffer and bind it
@@ -489,7 +572,7 @@ int crenvk_device_create_buffer(VkDevice device, VkPhysicalDevice physicalDevice
     // if data is provided, copy it into the buffer
     if (data) {
         void* mapped = NULL;
-        if(vkMapMemory(device, *memory, 0, size, 0, &mapped) != VK_SUCCESS) {
+        if (vkMapMemory(device, *memory, 0, size, 0, &mapped) != VK_SUCCESS) {
             vkDestroyBuffer(device, *buffer, NULL);
             return 0;
         }
@@ -498,12 +581,12 @@ int crenvk_device_create_buffer(VkDevice device, VkPhysicalDevice physicalDevice
 
         // flush the memory if it's not host-coherent
         if ((properties & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {
-            VkMappedMemoryRange memoryRange = {0};
+            VkMappedMemoryRange memoryRange = { 0 };
             memoryRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
             memoryRange.memory = *memory;
             memoryRange.offset = 0;
             memoryRange.size = size;
-            if(vkFlushMappedMemoryRanges(device, 1, &memoryRange) == VK_SUCCESS, "Failed to flush mapped memory") {
+            if (vkFlushMappedMemoryRanges(device, 1, &memoryRange) != VK_SUCCESS) { // Failed to flush mapped memory
                 vkUnmapMemory(device, *memory);
                 vkDestroyBuffer(device, *buffer, NULL);
                 return 0;
@@ -532,7 +615,7 @@ static vkSwapchainDetails internal_crenvk_query_swapchain_details(VkPhysicalDevi
     vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &details.surfaceFormatCount, NULL);
 
     if (details.surfaceFormatCount != 0) {
-        details.pSurfaceFormats = crenmemory_allocate(details.surfaceFormatCount * sizeof(VkSurfaceFormatKHR), 1);
+        details.pSurfaceFormats = (VkSurfaceFormatKHR*)crenmemory_allocate(details.surfaceFormatCount * sizeof(VkSurfaceFormatKHR), 1);
         if (details.pSurfaceFormats) {
             vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &details.surfaceFormatCount, details.pSurfaceFormats);
         }
@@ -540,7 +623,7 @@ static vkSwapchainDetails internal_crenvk_query_swapchain_details(VkPhysicalDevi
 
     vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &details.presentModeCount, NULL);
     if (details.presentModeCount != 0) {
-        details.pPresentModes = crenmemory_allocate(details.presentModeCount * sizeof(VkPresentModeKHR), 1);
+        details.pPresentModes = (VkPresentModeKHR*)crenmemory_allocate(details.presentModeCount * sizeof(VkPresentModeKHR), 1);
         if (details.pPresentModes) {
             vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &details.presentModeCount, details.pPresentModes);
         }
@@ -623,7 +706,7 @@ static int internal_crenvk_swapchain_create(vkSwapchain* swapchain, VkDevice dev
 
     // create swapchain
     vkQueueFamilyIndices indices = internal_crenvk_find_queue_families(physicalDevice, surface);
-    unsigned int queueFamilyIndices[] = { indices.graphicFamily, indices.presentFamily, indices.computeFamily };
+    int queueFamilyIndices[] = { indices.graphicFamily, indices.presentFamily, indices.computeFamily };
     VkSwapchainCreateInfoKHR swapchainCI = { 0 };
     swapchainCI.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     swapchainCI.pNext = NULL;
@@ -644,7 +727,7 @@ static int internal_crenvk_swapchain_create(vkSwapchain* swapchain, VkDevice dev
     if (indices.graphicFamily != indices.presentFamily) {
         swapchainCI.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         swapchainCI.queueFamilyIndexCount = 2;
-        swapchainCI.pQueueFamilyIndices = queueFamilyIndices;
+        swapchainCI.pQueueFamilyIndices = (unsigned int*)queueFamilyIndices;
     }
 
     else {
@@ -652,6 +735,7 @@ static int internal_crenvk_swapchain_create(vkSwapchain* swapchain, VkDevice dev
     }
 
     if(vkCreateSwapchainKHR(device, &swapchainCI, NULL, &swapchain->swapchain) != VK_SUCCESS) {
+        cren_set_error(Vulkan_SwapchainCreationFailed);
         crenmemory_deallocate(details.pPresentModes);
         crenmemory_deallocate(details.pSurfaceFormats);
         return 0;
@@ -662,7 +746,7 @@ static int internal_crenvk_swapchain_create(vkSwapchain* swapchain, VkDevice dev
     vkGetSwapchainImagesKHR(device, swapchain->swapchain, &swapchain->swapchainImageCount, swapchain->swapchainImages);
 
     // create image views
-    swapchain->swapchainImageViews = crenmemory_allocate(sizeof(VkImageView) * swapchain->swapchainImageCount, 1); // dont forget to deallocate at shutdown or resizes
+    swapchain->swapchainImageViews = (VkImageView*)crenmemory_allocate(sizeof(VkImageView) * swapchain->swapchainImageCount, 1); // dont forget to deallocate at shutdown or resizes
     for (unsigned int i = 0; i < swapchain->swapchainImageCount; i++) {
         swapchain->swapchainImageViews[i] = crenvk_image_view_create(device, swapchain->swapchainImages[i], swapchain->swapchainFormat.format, VK_IMAGE_ASPECT_COLOR_BIT, 1, 1, VK_IMAGE_VIEW_TYPE_2D);
     }
@@ -690,52 +774,6 @@ static void internal_crenvk_swapchain_destroy(vkSwapchain* swapchain, VkDevice d
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Pipeline-related
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// @brief opens the SPIRV file containing the shader code and returns it
-/// @param source path on disk
-/// @param outSize spirv code size
-/// @return the address to the loaded spirv code or NULL if an error occured
-static unsigned int* internal_crenvk_shader_loadspirv(const char* source, size_t* outSize) {
-    FILE* file = fopen(source, "rb");
-    if (!file) {
-        return NULL;
-    }
-
-    // get the file size
-    fseek(file, 0, SEEK_END);
-    long file_size = ftell(file);
-    fseek(file, 0, SEEK_SET);
-
-    // ensure the file size is valid
-    if (file_size <= 0 || file_size % sizeof(unsigned int) != 0) {
-        fclose(file);
-        return NULL;
-    }
-
-    // allocate memory for the SPIR-V code
-    unsigned int* spirv_code = (unsigned int*)crenmemory_allocate(file_size, 0);
-    if (!spirv_code) {
-        fclose(file);
-        return NULL;
-    }
-
-    // read the file into the buffer
-    size_t word_count = file_size / sizeof(unsigned int);
-    size_t read_count = fread(spirv_code, sizeof(unsigned int), word_count, file);
-    if (read_count != word_count) {
-        crenmemory_deallocate(spirv_code);
-        fclose(file);
-        return NULL;
-    }
-
-    fclose(file);
-
-    if (outSize) {
-        *outSize = file_size;
-    }
-
-    return spirv_code;
-}
 
 /// @brief creates an array of VkVertexInputBindingDescription based on parameters
 /// @param passingVertexData flags if vertex data is passed to the shader stages
@@ -811,6 +849,8 @@ static VkVertexInputAttributeDescription* internal_crenvk_get_attribute_descript
 				desc.offset = offsetof(vkVertex, joints_0);
 				break;
 			}
+
+            default: break;
 		}
 
 		bindings[i] = desc;
@@ -849,17 +889,17 @@ static VkPipelineVertexInputStateCreateInfo internal_crenvk_pipeline_populate_vi
 static void internal_crenvk_pipeline_quad_create(Hashtable* pipelines, vkRenderpass* usedRenderpass, vkRenderpass* pickingRenderpass, VkDevice device,  const char* rootPath) {
 	
     // default pipeline
-	vkPipeline* defaultPipeline = crenhashtable_lookup(pipelines, CREN_PIPELINE_QUAD_DEFAULT_NAME);
+	vkPipeline* defaultPipeline = (vkPipeline*)crenhashtable_lookup(pipelines, CREN_PIPELINE_QUAD_DEFAULT_NAME);
 	if (defaultPipeline != NULL) crenvk_pipeline_destroy(device, defaultPipeline);
 
 	char defaultVert[CREN_PATH_MAX_SIZE], defaultFrag[CREN_PATH_MAX_SIZE];
-	cren_get_path("shader/compiled/quad_default.vert.spv", rootPath, 0, defaultVert, sizeof(defaultVert));
-	cren_get_path("shader/compiled/quad_default.frag.spv", rootPath, 0, defaultFrag, sizeof(defaultFrag));
+	cren_get_path("shader/compiled/quad.vert.spv", rootPath, 0, defaultVert, sizeof(defaultVert));
+	cren_get_path("shader/compiled/quad.frag.spv", rootPath, 0, defaultFrag, sizeof(defaultFrag));
 
 	vkPipelineCreateInfo ci = { 0 };
 	ci.renderpass = usedRenderpass; // this will either be default or viewport renderpass
-	ci.vertexShader = crenvk_shader_create(device, "quad_default.vert", defaultVert, SHADER_TYPE_VERTEX);
-	ci.fragmentShader = crenvk_shader_create(device, "quad_default.frag", defaultFrag, SHADER_TYPE_FRAGMENT);
+	ci.vertexShader = crenvk_shader_create(device, "quad.vert", defaultVert, SHADER_TYPE_VERTEX);
+	ci.fragmentShader = crenvk_shader_create(device, "quad.frag", defaultFrag, SHADER_TYPE_FRAGMENT);
 	ci.passingVertexData = 0;
 	ci.alphaBlending = 1;
 
@@ -896,17 +936,17 @@ static void internal_crenvk_pipeline_quad_create(Hashtable* pipelines, vkRenderp
 	crenhashtable_insert(pipelines, CREN_PIPELINE_QUAD_DEFAULT_NAME, defaultPipeline);
 
 	// picking pipeline
-	vkPipeline* pickingPipeline = crenhashtable_lookup(pipelines, CREN_PIPELINE_QUAD_PICKING_NAME);
+	vkPipeline* pickingPipeline = (vkPipeline*)crenhashtable_lookup(pipelines, CREN_PIPELINE_QUAD_PICKING_NAME);
 	if (pickingPipeline != NULL) crenvk_pipeline_destroy(device, pickingPipeline);
 
 	char pickingVert[CREN_PATH_MAX_SIZE], pickingFrag[CREN_PATH_MAX_SIZE];
 	cren_get_path("shader/compiled/quad_picking.vert.spv", rootPath, 0, pickingVert, sizeof(pickingVert));
 	cren_get_path("shader/compiled/quad_picking.frag.spv", rootPath, 0, pickingFrag, sizeof(pickingFrag));
 
-	ci = (vkPipelineCreateInfo){ 0 };
+	ci = (vkPipelineCreateInfo) { 0 };
 	ci.renderpass = pickingRenderpass;
-	ci.vertexShader = crenvk_shader_create(device, "quad_picking.vert", pickingVert, SHADER_TYPE_VERTEX);
-	ci.fragmentShader = crenvk_shader_create(device, "quad_picking.frag", pickingFrag, SHADER_TYPE_FRAGMENT);
+	ci.vertexShader = crenvk_shader_create(device, "quad.vert", pickingVert, SHADER_TYPE_VERTEX);
+	ci.fragmentShader = crenvk_shader_create(device, "quad.frag", pickingFrag, SHADER_TYPE_FRAGMENT);
 	ci.passingVertexData = 0;
 	ci.alphaBlending = 0;
 
@@ -983,14 +1023,14 @@ vkPipeline* crenvk_pipeline_create(VkDevice device, vkPipelineCreateInfo *ci) {
 	// vertex input state
 	pipeline->vertexInputState = internal_crenvk_pipeline_populate_visci(pipeline, ci->vertexComponents, ci->vertexComponentsCount);
 	// input vertex assembly state
-	pipeline->inputVertexAssemblyState = (VkPipelineInputAssemblyStateCreateInfo){ 0 };
+	pipeline->inputVertexAssemblyState = (VkPipelineInputAssemblyStateCreateInfo) { 0 };
 	pipeline->inputVertexAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 	pipeline->inputVertexAssemblyState.pNext = NULL;
 	pipeline->inputVertexAssemblyState.flags = 0;
 	pipeline->inputVertexAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	pipeline->inputVertexAssemblyState.primitiveRestartEnable = VK_FALSE;
 	// viewport state
-	pipeline->viewportState = (VkPipelineViewportStateCreateInfo){ 0 };
+	pipeline->viewportState = (VkPipelineViewportStateCreateInfo) { 0 };
 	pipeline->viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 	pipeline->viewportState.pNext = NULL;
 	pipeline->viewportState.flags = 0;
@@ -999,7 +1039,7 @@ vkPipeline* crenvk_pipeline_create(VkDevice device, vkPipelineCreateInfo *ci) {
 	pipeline->viewportState.scissorCount = 1;
 	pipeline->viewportState.pScissors = NULL; // using dynamic scissor
 	// rasterization state
-	pipeline->rasterizationState = (VkPipelineRasterizationStateCreateInfo){ 0 };
+	pipeline->rasterizationState = (VkPipelineRasterizationStateCreateInfo) { 0 };
 	pipeline->rasterizationState.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 	pipeline->rasterizationState.pNext = NULL;
 	pipeline->rasterizationState.flags = 0;
@@ -1010,14 +1050,14 @@ vkPipeline* crenvk_pipeline_create(VkDevice device, vkPipelineCreateInfo *ci) {
 	pipeline->rasterizationState.rasterizerDiscardEnable = VK_FALSE;
 	pipeline->rasterizationState.lineWidth = 1.0f;
 	// multisampling state
-	pipeline->multisampleState = (VkPipelineMultisampleStateCreateInfo){ 0 };
+	pipeline->multisampleState = (VkPipelineMultisampleStateCreateInfo) { 0 };
 	pipeline->multisampleState.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	pipeline->multisampleState.pNext = NULL;
 	pipeline->multisampleState.flags = 0;
 	pipeline->multisampleState.rasterizationSamples = ci->renderpass->msaa;
 	pipeline->multisampleState.sampleShadingEnable = VK_FALSE;
 	// depth stencil state
-	pipeline->depthStencilState = (VkPipelineDepthStencilStateCreateInfo){ 0 };
+	pipeline->depthStencilState = (VkPipelineDepthStencilStateCreateInfo) { 0 };
 	pipeline->depthStencilState.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 	pipeline->depthStencilState.pNext = NULL;
 	pipeline->depthStencilState.flags = 0;
@@ -1026,7 +1066,7 @@ vkPipeline* crenvk_pipeline_create(VkDevice device, vkPipelineCreateInfo *ci) {
 	pipeline->depthStencilState.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 	pipeline->depthStencilState.back.compareOp = VK_COMPARE_OP_ALWAYS;
 	// color blend attachment
-	pipeline->colorBlendAttachmentState = (VkPipelineColorBlendAttachmentState){ 0 };
+	pipeline->colorBlendAttachmentState = (VkPipelineColorBlendAttachmentState) { 0 };
 	pipeline->colorBlendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 	pipeline->colorBlendAttachmentState.blendEnable = ci->alphaBlending == 1 ? VK_TRUE : VK_FALSE;
 	pipeline->colorBlendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
@@ -1036,7 +1076,7 @@ vkPipeline* crenvk_pipeline_create(VkDevice device, vkPipelineCreateInfo *ci) {
 	pipeline->colorBlendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
 	pipeline->colorBlendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
 	// color blend state
-	pipeline->colorBlendState = (VkPipelineColorBlendStateCreateInfo){ 0 };
+	pipeline->colorBlendState = (VkPipelineColorBlendStateCreateInfo) { 0 };
 	pipeline->colorBlendState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 	pipeline->colorBlendState.pNext = NULL;
 	pipeline->colorBlendState.flags = 0;
@@ -1120,6 +1160,7 @@ void crenvk_renderpass_destroy(VkDevice device, vkRenderpass* renderpass) {
 }
 
 vkShader crenvk_shader_create(VkDevice device, const char *name, const char *path, vkShaderType type) {
+    
     vkShader shader = { 0 };
     shader.name = name;
     shader.path = path;
@@ -1139,8 +1180,10 @@ vkShader crenvk_shader_create(VkDevice device, const char *name, const char *pat
         default: { break; }
     }
 
-    size_t spirvSize = 0;
-    unsigned int* spirvCode = internal_crenvk_shader_loadspirv(path, &spirvSize);
+    unsigned long long spirvSize = 0;
+    unsigned int* spirvCode = cren_load_file(path, &spirvSize);
+    if (spirvCode == NULL) CREN_LOG("SPIR-V code is NULL, therefore could not load file");
+
     VkShaderModuleCreateInfo moduleCI = { 0 };
     moduleCI.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     moduleCI.pNext = NULL;
@@ -1160,6 +1203,7 @@ void crenvk_shader_destroy(VkDevice device, vkShader shader)
 }
 
 int crenvk_vertex_equals(vkVertex *v0, vkVertex *v1) {
+
     return float3_equal(&v0->position, &v1->position) &&
            float3_equal(&v0->normal, &v1->normal) &&
            float2_equal(&v0->uv_0, &v1->uv_0) &&
@@ -1304,12 +1348,16 @@ static int internal_crenvk_renderphase_default_commandpool_create(vkDefaultRende
     cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     cmdPoolInfo.queueFamilyIndex = indices.graphicFamily;
     cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    if(vkCreateCommandPool(device->device, &cmdPoolInfo, NULL, &renderpass->commandPool) != VK_SUCCESS) return 0;
+    if (vkCreateCommandPool(device->device, &cmdPoolInfo, NULL, &renderpass->commandPool) != VK_SUCCESS) {
+        cren_set_error(Vulkan_CommandPoolCreationFailed);
+        return 0;
+    }
 
     // command buffers
     renderpass->commandBufferCount = CREN_CONCURRENTLY_RENDERED_FRAMES;
-    renderpass->commandBuffers = crenmemory_allocate(sizeof(VkCommandBuffer) * renderpass->commandBufferCount, 1);
+    renderpass->commandBuffers = (VkCommandBuffer*)crenmemory_allocate(sizeof(VkCommandBuffer) * renderpass->commandBufferCount, 1);
     if(!renderpass->commandBuffers) {
+        cren_set_error(Vulkan_CommandBufferCreationFailed);
         vkDestroyCommandPool(device->device, renderpass->commandPool, NULL);
         return 0;
     }
@@ -1320,6 +1368,7 @@ static int internal_crenvk_renderphase_default_commandpool_create(vkDefaultRende
     cmdBufferAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     cmdBufferAllocInfo.commandBufferCount = renderpass->commandBufferCount;
     if(vkAllocateCommandBuffers(device->device, &cmdBufferAllocInfo, renderpass->commandBuffers) != VK_SUCCESS) {
+        cren_set_error(Vulkan_CommandBufferAllocationFailed);
         vkDestroyCommandPool(device->device, renderpass->commandPool, NULL);
         crenmemory_deallocate(renderpass->commandBuffers);
         return 0;
@@ -1394,6 +1443,7 @@ static int internal_crenvk_renderphase_default_framebuffers_create(vkDefaultRend
         fbci.height = swapchain->swapchainExtent.height;
         fbci.layers = 1;
         if(vkCreateFramebuffer(device->device, &fbci, NULL, &renderpass->framebuffers[i]) == VK_SUCCESS) {
+            cren_set_error(Vulkan_FramebufferCreationFailed);
             failed =  1;
         }
     }
@@ -1417,8 +1467,8 @@ static int internal_crenvk_renderphase_default_framebuffers_create(vkDefaultRend
 /// @return the cren vkPipeline object used by the vkDefaultRenderphase
 static vkPipeline* internal_crenvk_renderphase_default_pipeline_create(vkDefaultRenderphase* phase, VkDevice device,  int build, const char* rootPath) {
     char vert[CREN_PATH_MAX_SIZE], frag[CREN_PATH_MAX_SIZE];
-    cren_get_path("shader/compiled/mesh_default.vert.spv", rootPath, 0, vert, sizeof(vert));
-    cren_get_path("shader/compiled/mesh_default.frag.spv", rootPath, 0, frag, sizeof(frag));
+    cren_get_path("shader/compiled/mesh.vert.spv", rootPath, 0, vert, sizeof(vert));
+    cren_get_path("shader/compiled/mesh.frag.spv", rootPath, 0, frag, sizeof(frag));
 
     VkPushConstantRange pushConstant = { 0 };
     pushConstant.offset = 0;
@@ -1428,7 +1478,7 @@ static vkPipeline* internal_crenvk_renderphase_default_pipeline_create(vkDefault
     vkPipelineCreateInfo ci = { 0 };
     ci.renderpass = phase->renderpass;
     ci.passingVertexData = 1;
-    ci.pipelineCache = NULL;
+    ci.pipelineCache = VK_NULL_HANDLE;
     ci.vertexShader = crenvk_shader_create(device, "MeshDefault.vert", vert, SHADER_TYPE_VERTEX);
     ci.fragmentShader = crenvk_shader_create(device, "MeshDefault.frag", frag, SHADER_TYPE_FRAGMENT);
     ci.vertexComponentsCount = 3;
@@ -1509,8 +1559,8 @@ static void internal_crenvk_renderphase_default_update(vkDefaultRenderphase* pha
     CRenVulkanBackend* renderer = (CRenVulkanBackend*)context->backend;
     VkClearValue clearValues[2] = { 0 };
     const unsigned int clearValuesCount = 2;
-    clearValues[0].color = (VkClearColorValue) {.float32[0] = 0.0f, .float32[1] = 0.0f, .float32[2] = 0.0f, .float32[3] =  1.0f };
-    clearValues[1].depthStencil = (VkClearDepthStencilValue){ .depth = 1.0f, .stencil = 0 };
+    clearValues[0].color = (VkClearColorValue) { 0.0f, 0.0f, 0.0f, 1.0f };
+    clearValues[1].depthStencil = (VkClearDepthStencilValue) { 1.0f, 0 };
 
     VkCommandBuffer cmdBuffer = phase->renderpass->commandBuffers[currentFrame];
     VkFramebuffer frameBuffer = phase->renderpass->framebuffers[swapchainImageIndex];
@@ -1528,7 +1578,7 @@ static void internal_crenvk_renderphase_default_update(vkDefaultRenderphase* pha
     renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassBeginInfo.renderPass = renderPass;
     renderPassBeginInfo.framebuffer = frameBuffer;
-    renderPassBeginInfo.renderArea.offset = (VkOffset2D){ .x = 0, .y = 0 };
+    renderPassBeginInfo.renderArea.offset = (VkOffset2D) { 0, 0 };
     renderPassBeginInfo.renderArea.extent = renderer->swapchain.swapchainExtent;
     renderPassBeginInfo.clearValueCount = clearValuesCount;
     renderPassBeginInfo.pClearValues = clearValues;
@@ -1546,14 +1596,14 @@ static void internal_crenvk_renderphase_default_update(vkDefaultRenderphase* pha
 
     // set frame commandbuffer scissor
     VkRect2D scissor = { 0 };
-    scissor.offset = (VkOffset2D){ .x = 0, .y =  0 };
+    scissor.offset = (VkOffset2D) { 0, 0 };
     scissor.extent = renderer->swapchain.swapchainExtent;
     vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
     // not using viewport as the final target, therefore it's time to draw the objects
     if (!usingViewport) {
         if (callback != NULL) {
-            callback(context, VK_RENDER_STAGE_DEFAULT, timestep);
+            callback(context, (CRenRenderStage)Default, timestep);
         }
     }
 
@@ -1678,11 +1728,15 @@ static int internal_crenvk_renderphase_picking_commandpool_create(vkPickingRende
     cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     cmdPoolInfo.queueFamilyIndex = indices.graphicFamily;
     cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    if(vkCreateCommandPool(device->device, &cmdPoolInfo, NULL, &phase->renderpass->commandPool) != VK_SUCCESS) return 0;
+    if (vkCreateCommandPool(device->device, &cmdPoolInfo, NULL, &phase->renderpass->commandPool) != VK_SUCCESS) {
+        cren_set_error(Vulkan_CommandPoolCreationFailed);
+        return 0;
+    }
 
     phase->renderpass->commandBufferCount = CREN_CONCURRENTLY_RENDERED_FRAMES;
     phase->renderpass->commandBuffers = (VkCommandBuffer*)crenmemory_allocate(sizeof(VkCommandBuffer) * phase->renderpass->commandBufferCount, 1);
     if(!phase->renderpass->commandBuffers) {
+        cren_set_error(Vulkan_CommandBufferCreationFailed);
         vkDestroyCommandPool(device->device, phase->renderpass->commandPool, NULL);
         return 0;
     }
@@ -1693,6 +1747,7 @@ static int internal_crenvk_renderphase_picking_commandpool_create(vkPickingRende
     cmdBufferAllocInfo.commandPool = phase->renderpass->commandPool;
     cmdBufferAllocInfo.commandBufferCount = phase->renderpass->commandBufferCount;
     if(vkAllocateCommandBuffers(device->device, &cmdBufferAllocInfo, phase->renderpass->commandBuffers) != VK_SUCCESS) {
+        cren_set_error(Vulkan_CommandBufferAllocationFailed);
         vkDestroyCommandPool(device->device, phase->renderpass->commandPool, NULL);
         crenmemory_deallocate(phase->renderpass->commandBuffers);
         return 0;
@@ -1812,7 +1867,10 @@ static int internal_crenvk_renderphase_picking_framebuffers_create(vkPickingRend
 
     if(!success) { // and error ocurred when created a framebuffer
         for (unsigned int i = 0; i < phase->renderpass->framebufferCount; i++) {
-            if(phase->renderpass->framebuffers[i]) vkDestroyFramebuffer(device->device, phase->renderpass->framebuffers[i], NULL);
+            if (phase->renderpass->framebuffers[i]) {
+                cren_set_error(Vulkan_FramebufferCreationFailed);
+                vkDestroyFramebuffer(device->device, phase->renderpass->framebuffers[i], NULL);
+            }
         }
 
         vkDestroyImage(device->device, phase->colorImage, NULL);
@@ -1844,7 +1902,7 @@ static vkPipeline* internal_crenvk_renderphase_picking_pipeline_create(vkPicking
     vkPipelineCreateInfo ci = { 0 };
     ci.renderpass = phase->renderpass;
     ci.passingVertexData = 1;
-    ci.pipelineCache = NULL;
+    ci.pipelineCache = VK_NULL_HANDLE;
     ci.vertexShader = crenvk_shader_create(device, "MeshPicking.vert", vert, SHADER_TYPE_VERTEX);
     ci.fragmentShader = crenvk_shader_create(device, "MeshPicking.frag", frag, SHADER_TYPE_FRAGMENT);
     ci.vertexComponentsCount = 1;
@@ -1914,8 +1972,8 @@ static void internal_crenvk_renderphase_picking_recreate(vkPickingRenderphase* p
 static void internal_crenvk_renderphase_picking_update(vkPickingRenderphase* phase, CRenContext* context, unsigned int currentFrame, unsigned int swapchainImageIndex, int usingViewport, double timestep, CRenCallback_Render callback) {
     CRenVulkanBackend* renderer = (CRenVulkanBackend*)context->backend;
     VkClearValue clearValues[2] = { 0 };
-    clearValues[0].color = (VkClearColorValue){ 0.0f,  0.0f,  0.0f, 1.0f };
-    clearValues[1].depthStencil = (VkClearDepthStencilValue){ .depth = 1.0f, .stencil = 0 };
+    clearValues[0].color = (VkClearColorValue) { 0.0f,  0.0f,  0.0f, 1.0f };
+    clearValues[1].depthStencil = (VkClearDepthStencilValue) { 1.0f,0 };
 
     VkCommandBuffer cmdBuffer = phase->renderpass->commandBuffers[currentFrame];
     VkFramebuffer frameBuffer = phase->renderpass->framebuffers[swapchainImageIndex];
@@ -1933,9 +1991,9 @@ static void internal_crenvk_renderphase_picking_update(vkPickingRenderphase* pha
     renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassBeginInfo.renderPass = renderPass;
     renderPassBeginInfo.framebuffer = frameBuffer;
-    renderPassBeginInfo.renderArea.offset = (VkOffset2D){ .x = 0, .y = 0 };
+    renderPassBeginInfo.renderArea.offset = (VkOffset2D) { 0, 0 };
     renderPassBeginInfo.renderArea.extent = renderer->swapchain.swapchainExtent;
-    renderPassBeginInfo.clearValueCount = (uint32_t)CREN_ARRAYSIZE(clearValues);
+    renderPassBeginInfo.clearValueCount = (unsigned int)CREN_ARRAYSIZE(clearValues);
     renderPassBeginInfo.pClearValues = clearValues;
     vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -1957,20 +2015,20 @@ static void internal_crenvk_renderphase_picking_update(vkPickingRenderphase* pha
         float2 mousePos = { 0.0f, 0.0f };   //glm::clamp(Platform::MainWindow::GetRef().GetViewportCursorPos(boundaries.position, boundaries.size), glm::vec2(0.0f, 0.0f), glm::vec2(extent.width, extent.height));
 
         VkRect2D scissor = { 0 };
-        scissor.offset = (VkOffset2D){ .x = (unsigned int)mousePos.x, .y = (unsigned int)mousePos.y };
-        scissor.extent = (VkExtent2D){ 1, 1 };
+        scissor.offset = ( VkOffset2D ){ (int)mousePos.x, (int)mousePos.y };
+        scissor.extent = (VkExtent2D) { 1, 1 };
         vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
     }
 
     else {
         VkRect2D scissor = { 0 };
-        scissor.offset = (VkOffset2D){ .x = 0, .y = 0 };
+        scissor.offset = (VkOffset2D) { 0, 0 };
         scissor.extent = renderer->swapchain.swapchainExtent;
         vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
     }
 
     if (callback != NULL) {
-        callback(context, VK_RENDER_STAGE_PICKING, timestep);
+        callback(context, (CRenRenderStage)Picking, timestep);
     }
 
     // end render pass
@@ -2063,7 +2121,7 @@ static vkUIRenderphase internal_crenvk_renderphase_ui_create(VkDevice device, Vk
 	poolCI.pNext = NULL;
 	poolCI.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 	poolCI.maxSets = 1000 * CREN_ARRAYSIZE(poolSizes);
-	poolCI.poolSizeCount = (uint32_t)CREN_ARRAYSIZE(poolSizes);
+	poolCI.poolSizeCount = (unsigned int)CREN_ARRAYSIZE(poolSizes);
 	poolCI.pPoolSizes = poolSizes;
 	CREN_ASSERT(vkCreateDescriptorPool(device, &poolCI, NULL, &phase.descPool) == VK_SUCCESS, "Failed to create descriptor pool for the User Interface");
 
@@ -2097,6 +2155,7 @@ static int internal_crenvk_renderphase_ui_commandpool_create(vkUIRenderphase* ph
 	cmdPoolInfo.queueFamilyIndex = indices.graphicFamily;
 	cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     if(vkCreateCommandPool(device->device, &cmdPoolInfo, NULL, &renderpass->commandPool) != VK_SUCCESS) {
+        cren_set_error(Vulkan_CommandPoolCreationFailed);
         return 0;
     }
 
@@ -2105,6 +2164,7 @@ static int internal_crenvk_renderphase_ui_commandpool_create(vkUIRenderphase* ph
 	phase->renderpass->commandBuffers = (VkCommandBuffer*)crenmemory_allocate(sizeof(VkCommandBuffer) * phase->renderpass->commandBufferCount, 1);
 
     if(!phase->renderpass->commandBuffers) {
+        cren_set_error(Vulkan_CommandBufferCreationFailed);
         vkDestroyCommandPool(device->device, renderpass->commandPool, NULL);
         return 0;
     }
@@ -2115,6 +2175,7 @@ static int internal_crenvk_renderphase_ui_commandpool_create(vkUIRenderphase* ph
 	cmdBufferAllocInfo.commandPool = phase->renderpass->commandPool;
 	cmdBufferAllocInfo.commandBufferCount = phase->renderpass->commandBufferCount;
 	if(vkAllocateCommandBuffers(device->device, &cmdBufferAllocInfo, phase->renderpass->commandBuffers) != VK_SUCCESS) {
+        cren_set_error(Vulkan_CommandBufferAllocationFailed);
         vkDestroyCommandPool(device->device, renderpass->commandPool, NULL);
         crenmemory_deallocate(phase->renderpass->commandBuffers);
         return 0;
@@ -2140,12 +2201,13 @@ static int internal_crenvk_renderphase_ui_framebuffers_create(vkUIRenderphase* p
 		VkFramebufferCreateInfo framebufferCI = { 0 };
 		framebufferCI.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 		framebufferCI.renderPass = phase->renderpass->renderPass;
-		framebufferCI.attachmentCount = (uint32_t)CREN_ARRAYSIZE(attachments);
+		framebufferCI.attachmentCount = (unsigned int)CREN_ARRAYSIZE(attachments);
 		framebufferCI.pAttachments = attachments;
 		framebufferCI.width = swapchain->swapchainExtent.width;
 		framebufferCI.height = swapchain->swapchainExtent.height;
 		framebufferCI.layers = 1;
 		if(vkCreateFramebuffer(device->device, &framebufferCI, NULL, &phase->renderpass->framebuffers[i]) != VK_SUCCESS) {
+            cren_set_error(Vulkan_FramebufferCreationFailed);
             crenmemory_deallocate(phase->renderpass->framebuffers);
             return 0;
         } 
@@ -2161,7 +2223,7 @@ static int internal_crenvk_renderphase_ui_framebuffers_create(vkUIRenderphase* p
 static void internal_crenvk_renderphase_ui_recreate(vkUIRenderphase* phase,vkDevice* device, vkSwapchain* swapchain) {
 	vkDeviceWaitIdle(device->device);
 
-	for (uint32_t i = 0; i < phase->renderpass->framebufferCount; i++) {
+	for (unsigned int i = 0; i < phase->renderpass->framebufferCount; i++) {
 		vkDestroyFramebuffer(device->device, phase->renderpass->framebuffers[i], NULL);
 	}
 
@@ -2195,7 +2257,7 @@ static void internal_crenvk_renderphase_ui_update(vkUIRenderphase* phase, CRenCo
 	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	renderPassBeginInfo.renderPass = renderPass;
 	renderPassBeginInfo.framebuffer = frameBuffer;
-	renderPassBeginInfo.renderArea.offset = (VkOffset2D){ 0, 0 };
+	renderPassBeginInfo.renderArea.offset = (VkOffset2D) { 0, 0 };
 	renderPassBeginInfo.renderArea.extent = renderer->swapchain.swapchainExtent;
 	renderPassBeginInfo.clearValueCount = 1;
 	renderPassBeginInfo.pClearValues = &clearValue;
@@ -2337,12 +2399,16 @@ static int internal_crenvk_renderphase_viewport_commandpool_create(vkViewportRen
 	cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	cmdPoolInfo.queueFamilyIndex = indices.graphicFamily;
 	cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-	if(vkCreateCommandPool(device->device, &cmdPoolInfo, NULL, &renderpass->commandPool) != VK_SUCCESS) return 0;
+    if (vkCreateCommandPool(device->device, &cmdPoolInfo, NULL, &renderpass->commandPool) != VK_SUCCESS) {
+        cren_set_error(Vulkan_CommandPoolCreationFailed);
+        return 0;
+    }
 
 	// command buffers
 	renderpass->commandBufferCount = CREN_CONCURRENTLY_RENDERED_FRAMES;
-	renderpass->commandBuffers = crenmemory_allocate(sizeof(VkCommandBuffer) * renderpass->commandBufferCount, 1);
+	renderpass->commandBuffers = (VkCommandBuffer*)crenmemory_allocate(sizeof(VkCommandBuffer) * renderpass->commandBufferCount, 1);
     if(!renderpass->commandBuffers) {
+        cren_set_error(Vulkan_CommandBufferCreationFailed);
         vkDestroyCommandPool(device->device, renderpass->commandPool, NULL);
         return 0;
     }
@@ -2353,6 +2419,7 @@ static int internal_crenvk_renderphase_viewport_commandpool_create(vkViewportRen
 	cmdBufferAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	cmdBufferAllocInfo.commandBufferCount = renderpass->commandBufferCount;
 	if(vkAllocateCommandBuffers(device->device, &cmdBufferAllocInfo, renderpass->commandBuffers) != VK_SUCCESS) {
+        cren_set_error(Vulkan_CommandBufferAllocationFailed);
         vkDestroyCommandPool(device->device, renderpass->commandPool, NULL);
         crenmemory_deallocate(renderpass->commandBuffers);
         return 0;
@@ -2379,8 +2446,8 @@ static int internal_crenvk_renderphase_viewport_framebuffers_create(vkViewportRe
 	poolCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	poolCI.pNext = NULL;
 	poolCI.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-	poolCI.maxSets = (uint32_t)(2 * CREN_ARRAYSIZE(poolSizes));
-	poolCI.poolSizeCount = (uint32_t)CREN_ARRAYSIZE(poolSizes);
+	poolCI.maxSets = (unsigned int)(2 * CREN_ARRAYSIZE(poolSizes));
+	poolCI.poolSizeCount = (unsigned int)CREN_ARRAYSIZE(poolSizes);
 	poolCI.pPoolSizes = poolSizes;
 	CREN_ASSERT(vkCreateDescriptorPool(device->device, &poolCI, NULL, &phase->descriptorPool) == VK_SUCCESS, "Failed to create vulkan descriptor pool for the viewport render phase");
 
@@ -2520,8 +2587,8 @@ static void internal_crenvk_renderphase_viewport_update(vkViewportRenderphase* p
 
     CRenVulkanBackend* renderer = (CRenVulkanBackend*)context->backend;
 	VkClearValue clearValues[2] = { 0 };
-	clearValues[0].color = (VkClearColorValue){ 0.0f,  0.0f,  0.0f, 1.0f };
-	clearValues[1].depthStencil = (VkClearDepthStencilValue){ .depth = 1.0f, .stencil = 0 };
+	clearValues[0].color = (VkClearColorValue) { 0.0f,  0.0f,  0.0f, 1.0f };
+	clearValues[1].depthStencil = (VkClearDepthStencilValue) { 1.0f,  0 };
 
 	VkCommandBuffer cmdBuffer = phase->renderpass->commandBuffers[currentFrame];
 	VkFramebuffer framebuffer = phase->renderpass->framebuffers[swapchainImageIndex];
@@ -2539,9 +2606,9 @@ static void internal_crenvk_renderphase_viewport_update(vkViewportRenderphase* p
 	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	renderPassBeginInfo.renderPass = renderPass;
 	renderPassBeginInfo.framebuffer = framebuffer;
-	renderPassBeginInfo.renderArea.offset = (VkOffset2D){ 0, 0 };
+	renderPassBeginInfo.renderArea.offset = (VkOffset2D) { 0, 0 };
 	renderPassBeginInfo.renderArea.extent = renderer->swapchain.swapchainExtent;
-	renderPassBeginInfo.clearValueCount = (uint32_t)CREN_ARRAYSIZE(clearValues);
+	renderPassBeginInfo.clearValueCount = (unsigned int)CREN_ARRAYSIZE(clearValues);
 	renderPassBeginInfo.pClearValues = clearValues;
 	vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -2557,12 +2624,12 @@ static void internal_crenvk_renderphase_viewport_update(vkViewportRenderphase* p
 
 	// set frame commandbuffer scissor
 	VkRect2D scissor = { 0 };
-	scissor.offset = (VkOffset2D){ 0, 0 };
+	scissor.offset = (VkOffset2D) { 0, 0 };
 	scissor.extent = renderer->swapchain.swapchainExtent;
 	vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
 	// render objects
-	if (callback != NULL) callback(context, VK_RENDER_STAGE_DEFAULT, timestep);
+	if (callback != NULL) callback(context, (CRenRenderStage)Default, timestep);
 
 	vkCmdEndRenderPass(cmdBuffer);
 
@@ -2576,6 +2643,7 @@ static void internal_crenvk_renderphase_viewport_update(vkViewportRenderphase* p
 
 int cren_vulkan_init(CRenVulkanBackend *backend, CRenCreateInfo* ci) {
 
+    CREN_LOG("Initializing vulkan code");
     backend->hint_viewport = ci->smallerViewport;
 
     int success = 1;
@@ -2583,8 +2651,8 @@ int cren_vulkan_init(CRenVulkanBackend *backend, CRenCreateInfo* ci) {
     success &= internal_crenvk_device_create(backend, ci->nativeWindow, ci->validations);
     success &= internal_crenvk_swapchain_create(&backend->swapchain, backend->device.device, backend->device.physicalDevice, backend->device.surface, ci->width, ci->height, ci->vsync);
     // swapchain does not have a pre-defined pipeline
-
-    backend->defaultRenderphase = internal_crenvk_renderphase_default_create(backend->device.device, backend->device.physicalDevice, backend->swapchain.swapchainFormat.format, (VkSampleCountFlagBits)ci->msaa, 0);
+    
+    backend->defaultRenderphase = internal_crenvk_renderphase_default_create (backend->device.device, backend->device.physicalDevice, backend->swapchain.swapchainFormat.format, (VkSampleCountFlagBits)ci->msaa, 0);
     success &= internal_crenvk_renderphase_default_commandpool_create(&backend->defaultRenderphase, &backend->device);
     success &= internal_crenvk_renderphase_default_framebuffers_create(&backend->defaultRenderphase, &backend->device, &backend->swapchain);
     backend->defaultRenderphase.pipeline = internal_crenvk_renderphase_default_pipeline_create(&backend->defaultRenderphase, backend->device.device, 1, ci->assetsRoot);
@@ -2620,10 +2688,10 @@ int cren_vulkan_init(CRenVulkanBackend *backend, CRenCreateInfo* ci) {
 
 void cren_vulkan_shutdown(CRenVulkanBackend *backend) {
 
-    crenvk_pipeline_destroy(backend->device.device, crenhashtable_lookup(backend->pipelinesLib, CREN_PIPELINE_QUAD_DEFAULT_NAME));
-    crenvk_pipeline_destroy(backend->device.device, crenhashtable_lookup(backend->pipelinesLib, CREN_PIPELINE_QUAD_PICKING_NAME));
+    crenvk_pipeline_destroy(backend->device.device, (vkPipeline*)crenhashtable_lookup(backend->pipelinesLib, CREN_PIPELINE_QUAD_DEFAULT_NAME));
+    crenvk_pipeline_destroy(backend->device.device, (vkPipeline*)crenhashtable_lookup(backend->pipelinesLib, CREN_PIPELINE_QUAD_PICKING_NAME));
 
-    crenvk_buffer_destroy(crenhashtable_lookup(backend->buffersLib, "Camera"), backend->device.device);
+    crenvk_buffer_destroy((vkBuffer*)crenhashtable_lookup(backend->buffersLib, "Camera"), backend->device.device);
 
     if (backend->hint_viewport) internal_crenvk_renderphase_viewport_destroy(&backend->viewportRenderphase, backend->device.device, 1);
 
@@ -2641,16 +2709,13 @@ void cren_vulkan_update(CRenContext* context, double timestep) {
 
     vkBufferCamera cameraData = { 0 };
     cameraData.view = context->camera.view;
+    cameraData.viewInverse = mat4_inverse(context->camera.view);
     cameraData.proj = context->camera.perspective;
 
-    // look up the camera buffer
-    vkBuffer* cameraBuffer = crenhashtable_lookup(renderer->buffersLib, "Camera");
-    if (cameraBuffer) {
-        void* where = crenarray_at(cameraBuffer->mappedData, renderer->device.currentFrame);
-        if (where != NULL) {
-            crenmemory_copy(where, &cameraData, sizeof(vkBufferCamera));
-        }
-    }
+    cameraData.proj.data[1] [1] *= -1.0f; // flyp y because vulkan
+
+    vkBuffer* cameraBuffer = (vkBuffer*)crenhashtable_lookup(renderer->buffersLib, "Camera");
+    crenmemory_copy(cameraBuffer->mappedData->data[renderer->device.currentFrame], &cameraData, sizeof(cameraData));
 }
 
 void cren_vulkan_render(CRenContext* context, double timestep) {
@@ -2664,7 +2729,7 @@ void cren_vulkan_render(CRenContext* context, double timestep) {
     VkResult res = vkAcquireNextImageKHR(renderer->device.device, renderer->swapchain.swapchain, UINT64_MAX, renderer->device.imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &renderer->device.imageIndex);
     
     if (res == VK_ERROR_OUT_OF_DATE_KHR) {
-        internal_crenvk_renderphase_default_recreate(&renderer->defaultRenderphase, &renderer->device, &renderer->swapchain, context->createInfo->width, context->createInfo->height, context->createInfo->vsync);
+        internal_crenvk_renderphase_default_recreate(&renderer->defaultRenderphase, &renderer->device, &renderer->swapchain, context->createInfo.width, context->createInfo.height, context->createInfo.vsync);
         internal_crenvk_renderphase_picking_recreate(&renderer->pickingRenderphase, &renderer->device, &renderer->swapchain);
         internal_crenvk_renderphase_ui_recreate(&renderer->uiRenderphase, &renderer->device, &renderer->swapchain);
     
@@ -2680,10 +2745,10 @@ void cren_vulkan_render(CRenContext* context, double timestep) {
 
     // manage renderpasses/render phases
     int usingViewport = renderer->hint_viewport;
-    internal_crenvk_renderphase_default_update(&renderer->defaultRenderphase, context, currentFrame, renderer->device.imageIndex, usingViewport, timestep, context->renderCallback);
-    internal_crenvk_renderphase_viewport_update(&renderer->viewportRenderphase, context, currentFrame, renderer->device.imageIndex, usingViewport, timestep, context->renderCallback);
-    internal_crenvk_renderphase_picking_update(&renderer->pickingRenderphase, context, currentFrame, renderer->device.imageIndex, usingViewport, timestep, context->renderCallback);
-    internal_crenvk_renderphase_ui_update(&renderer->uiRenderphase, context, currentFrame, renderer->device.imageIndex, context->drawUIRawDataCallback);
+    internal_crenvk_renderphase_default_update(&renderer->defaultRenderphase, context, currentFrame, renderer->device.imageIndex, usingViewport, timestep, (CRenCallback_Render)context->renderCallback);
+    internal_crenvk_renderphase_viewport_update(&renderer->viewportRenderphase, context, currentFrame, renderer->device.imageIndex, usingViewport, timestep, (CRenCallback_Render)context->renderCallback);
+    internal_crenvk_renderphase_picking_update(&renderer->pickingRenderphase, context, currentFrame, renderer->device.imageIndex, usingViewport, timestep, (CRenCallback_Render)context->renderCallback);
+    internal_crenvk_renderphase_ui_update(&renderer->uiRenderphase, context, currentFrame, renderer->device.imageIndex, (CRenCallback_DrawUIRawData)context->drawUIRawDataCallback);
 
     // submit command buffers
     VkSwapchainKHR swapChains[] = { renderer->swapchain.swapchain };
@@ -2708,7 +2773,7 @@ void cren_vulkan_render(CRenContext* context, double timestep) {
             renderer->uiRenderphase.renderpass->commandBuffers[currentFrame]
         };
 
-        submitInfo.commandBufferCount = (uint32_t)CREN_ARRAYSIZE(commandBuffers);
+        submitInfo.commandBufferCount = (unsigned int)CREN_ARRAYSIZE(commandBuffers);
         submitInfo.pCommandBuffers = commandBuffers;
     }
 
@@ -2719,7 +2784,7 @@ void cren_vulkan_render(CRenContext* context, double timestep) {
             renderer->uiRenderphase.renderpass->commandBuffers[currentFrame]
         };
 
-        submitInfo.commandBufferCount = (uint32_t)CREN_ARRAYSIZE(commandBuffers);
+        submitInfo.commandBufferCount = (unsigned int)CREN_ARRAYSIZE(commandBuffers);
         submitInfo.pCommandBuffers = commandBuffers;
     }
     
@@ -2739,7 +2804,7 @@ void cren_vulkan_render(CRenContext* context, double timestep) {
     if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR || renderer->hint_resize) {
         renderer->hint_resize = 0;
 
-        internal_crenvk_renderphase_default_recreate(&renderer->defaultRenderphase, &renderer->device, &renderer->swapchain, context->createInfo->width, context->createInfo->height, context->createInfo->vsync);
+        internal_crenvk_renderphase_default_recreate(&renderer->defaultRenderphase, &renderer->device, &renderer->swapchain, context->createInfo.width, context->createInfo.height, context->createInfo.vsync);
         internal_crenvk_renderphase_picking_recreate(&renderer->pickingRenderphase, &renderer->device, &renderer->swapchain);
         internal_crenvk_renderphase_ui_recreate(&renderer->uiRenderphase, &renderer->device, &renderer->swapchain);
         
@@ -2747,11 +2812,12 @@ void cren_vulkan_render(CRenContext* context, double timestep) {
             internal_crenvk_renderphase_viewport_recreate(&renderer->viewportRenderphase, &renderer->device, &renderer->swapchain);
         }
 
-        cren_camera_set_aspect_ratio(&context->camera, (float)(context->createInfo->width / context->createInfo->height));
+        float aspect = (float)context->createInfo.width / (float)context->createInfo.height;
+        cren_camera_set_aspect_ratio(&context->camera, aspect);
 
         CRenCallback_ImageCount fnImageCount = (CRenCallback_ImageCount)context->imageCountCallback;
         CRenCallback_Resize fnResize = (CRenCallback_Resize)context->resizeCallback;
-        if (context->resizeCallback != NULL) fnResize(context, context->createInfo->width, context->createInfo->height);
+        if (context->resizeCallback != NULL) fnResize(context, context->createInfo.width, context->createInfo.height);
         if (context->imageCountCallback != NULL) fnImageCount(context, renderer->swapchain.swapchainImageCount);
     }
 
@@ -2766,7 +2832,7 @@ void cren_vulkan_render(CRenContext* context, double timestep) {
 
 int crenvk_image_create(unsigned int width, unsigned int height, unsigned int mipLevels, unsigned int arrayLayers, VkDevice device, VkPhysicalDevice physicalDevice, VkImage *image, VkDeviceMemory *memory, VkFormat format, VkSampleCountFlagBits samples, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags memoryProperties, VkImageCreateFlags flags) {
     // specify and create image
-    VkImageCreateInfo imageCI = {0};
+    VkImageCreateInfo imageCI = { 0 };
     imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageCI.pNext = NULL;
     imageCI.flags = flags;
@@ -2902,14 +2968,14 @@ void crenvk_image_mipmaps_create(VkDevice device, VkQueue queue, VkCommandPool c
 		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
 
 		VkImageBlit blit = { 0 };
-		blit.srcOffsets[0] = (VkOffset3D){ 0, 0, 0 };
-		blit.srcOffsets[1] = (VkOffset3D){ mipWidth, mipHeight, 1 };
+		blit.srcOffsets[0] = (VkOffset3D) { 0, 0, 0 };
+		blit.srcOffsets[1] = (VkOffset3D) { mipWidth, mipHeight, 1 };
 		blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		blit.srcSubresource.mipLevel = i - 1;
 		blit.srcSubresource.baseArrayLayer = 0;
 		blit.srcSubresource.layerCount = 1;
-		blit.dstOffsets[0] = (VkOffset3D){ 0, 0, 0 };
-		blit.dstOffsets[1] = (VkOffset3D){ mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
+		blit.dstOffsets[0] = (VkOffset3D) { 0, 0, 0 };
+		blit.dstOffsets[1] = (VkOffset3D) { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
 		blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		blit.dstSubresource.mipLevel = i;
 		blit.dstSubresource.baseArrayLayer = 0;
@@ -2953,7 +3019,7 @@ void crenvk_image_memory_barrier_insert(VkCommandBuffer cmdBuffer, VkImage image
 	vkCmdPipelineBarrier(cmdBuffer, srcStageMask, dstStageMask, 0, 0, NULL, 0, NULL, 1, &imageMemoryBarrier);
 }
 
-int crenvk_image_transition_layout(VkDevice device, VkQueue queue, VkCommandPool cmdPool, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels, unsigned int layerCount)
+int crenvk_image_transition_layout(VkDevice device, VkQueue queue, VkCommandPool cmdPool, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, unsigned int mipLevels, unsigned int layerCount)
 {
 	VkCommandBuffer cmdBuffer = crenvk_commandbuffer_begin_singletime(device, cmdPool);
 
@@ -3079,7 +3145,7 @@ vkBuffer* crenvk_buffer_create(VkDevice device, VkPhysicalDevice physicalDevice,
 			return NULL;
 		}
 
-		if (crenarray_push_back(buffer->mappedData, mapped) != 0) {
+		if (crenarray_push_back(buffer->mappedData, mapped) != 1) {
             crenvk_buffer_destroy(buffer, device);
 			return NULL;
 		}
@@ -3243,7 +3309,7 @@ int crenvk_commandbuffer_end(VkDevice device, VkCommandPool cmdPool, VkCommandBu
 
 CRenTexture2D crenvk_texture2d_create_from_path(CRenContext* context, const char* path, int gui) {
     CRenTexture2D tex = { 0 };
-    tex.backend = crenmemory_allocate(sizeof(CRenTexture2DBackend), 0);
+    tex.backend = (CRenTexture2DBackend*)crenmemory_allocate(sizeof(CRenTexture2DBackend), 0);
 	cren_strncpy(tex.path, path, sizeof(tex.path) - 1);
 
 	int channels = 0;
@@ -3355,7 +3421,7 @@ CRenTexture2D crenvk_texture2d_create_from_path(CRenContext* context, const char
 
 CRenTexture2D crenvk_texture2d_create_from_buffer(CRenContext* context, CrenTexture2DBuffer* bufferInfo, int gui) {
     CRenTexture2D tex = { 0 };
-	tex.backend = crenmemory_allocate(sizeof(CRenTexture2DBackend), 0);
+	tex.backend = (CRenTexture2DBackend*)crenmemory_allocate(sizeof(CRenTexture2DBackend), 0);
 	tex.width = bufferInfo->width;
 	tex.height = bufferInfo->height;
 	tex.mipLevels = gui == 1 ? 1 : (int)d_floor(d_log2(int_max(tex.width, tex.height))) + 1;
@@ -3467,22 +3533,22 @@ void crenvk_texture2d_destroy(CRenContext* context, CRenTexture2D* texture)
 }
 
 VkSampler crenvk_texture2d_get_sampler(CRenTexture2D* texture) {
-    if (texture == NULL) return NULL;
-	if (texture->backend == NULL) return NULL;
+    if (texture == NULL) return VK_NULL_HANDLE;
+	if (texture->backend == NULL) return VK_NULL_HANDLE;
 
 	return texture->backend->sampler;
 }
 
 VkImageView crenvk_texture2d_get_image_view(CRenTexture2D* texture) {
-    if (texture == NULL) return NULL;
-	if (texture->backend == NULL) return NULL;
+    if (texture == NULL) return VK_NULL_HANDLE;
+	if (texture->backend == NULL) return VK_NULL_HANDLE;
 
 	return texture->backend->view;
 }
 
 VkDescriptorSet crenvk_texture2d_get_descriptor(CRenTexture2D *texture) {
-    if (texture == NULL) return NULL;
-	if (texture->backend == NULL) return NULL;
+    if (texture == NULL) return VK_NULL_HANDLE;
+	if (texture->backend == NULL) return VK_NULL_HANDLE;
 
 	return texture->backend->uiDescriptor;
 }
@@ -3501,7 +3567,7 @@ static void internal_crenvk_quad_update_descriptors(CRenContext* context, CRenQu
 	for (unsigned int i = 0; i < CREN_CONCURRENTLY_RENDERED_FRAMES; i++) {
 
 		// 0: camera data
-		vkBuffer* cameraBuffer = crenhashtable_lookup(renderer->buffersLib, "Camera");
+		vkBuffer* cameraBuffer = (vkBuffer*)crenhashtable_lookup(renderer->buffersLib, "Camera");
 		VkDescriptorBufferInfo camInfo = { 0 };
 		camInfo.buffer = cameraBuffer->buffers[i];
 		camInfo.offset = 0;
@@ -3558,10 +3624,10 @@ CRenQuad* crenvk_quad_create(CRenContext* context, const char* albedoPath) {
     
     CRenVulkanBackend* renderer = (CRenVulkanBackend*)context->backend;
 
-    CRenQuad* quad = crenmemory_allocate(sizeof(CRenQuad), 1);
+    CRenQuad* quad = (CRenQuad*)crenmemory_allocate(sizeof(CRenQuad), 1);
     if(!quad) return NULL;
 
-    quad->backend = crenmemory_allocate(sizeof(vkQuadBackend), 1);
+    quad->backend = (vkQuadBackend*)crenmemory_allocate(sizeof(vkQuadBackend), 1);
     if(!quad->backend) {
         crenmemory_deallocate(quad);
         return NULL;
@@ -3588,7 +3654,7 @@ CRenQuad* crenvk_quad_create(CRenContext* context, const char* albedoPath) {
 
 	VkDescriptorPoolCreateInfo descriptorPoolCI = { 0 };
 	descriptorPoolCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	descriptorPoolCI.poolSizeCount = (uint32_t)CREN_ARRAYSIZE(poolSizes);
+	descriptorPoolCI.poolSizeCount = (unsigned int)CREN_ARRAYSIZE(poolSizes);
 	descriptorPoolCI.pPoolSizes = poolSizes;
 	descriptorPoolCI.maxSets = CREN_CONCURRENTLY_RENDERED_FRAMES;
 	if(vkCreateDescriptorPool(renderer->device.device, &descriptorPoolCI, NULL, &quad->backend->descriptorPool) != VK_SUCCESS) {
@@ -3598,8 +3664,8 @@ CRenQuad* crenvk_quad_create(CRenContext* context, const char* albedoPath) {
         return NULL;
     }
 
-	vkPipeline* pipeline = crenhashtable_lookup(renderer->pipelinesLib, CREN_PIPELINE_QUAD_DEFAULT_NAME);
-	VkDescriptorSetLayout layouts[CREN_CONCURRENTLY_RENDERED_FRAMES] = { { pipeline->descriptorSetLayout },  {pipeline->descriptorSetLayout } };
+	vkPipeline* pipeline = (vkPipeline*)crenhashtable_lookup(renderer->pipelinesLib, CREN_PIPELINE_QUAD_DEFAULT_NAME);
+	VkDescriptorSetLayout layouts[CREN_CONCURRENTLY_RENDERED_FRAMES] = { pipeline->descriptorSetLayout,  pipeline->descriptorSetLayout };
 
 	VkDescriptorSetAllocateInfo descSetAllocInfo = { 0 };
 	descSetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -3649,7 +3715,7 @@ void crenvk_quad_apply_buffer_changes(CRenContext* context, CRenQuad* quad) {
 	}
 }
 
-void crenvk_quad_render(CRenContext* context, vkRenderStage stage, CRenQuad* quad, const mat4 transform) {
+void crenvk_quad_render(CRenContext* context, CRenRenderStage stage, CRenQuad* quad, const mat4 transform) {
     CRenVulkanBackend* renderer = (CRenVulkanBackend*)context->backend;
 	vkQuadBackend* backend = (vkQuadBackend*)quad->backend;
 	VkDeviceSize offsets[] = { 0 };
@@ -3659,9 +3725,9 @@ void crenvk_quad_render(CRenContext* context, vkRenderStage stage, CRenQuad* qua
 	unsigned int currentFrame = renderer->device.currentFrame;
 
 	switch (stage) {
-		case VK_RENDER_STAGE_DEFAULT:
+		case Default:
 		{
-			vkPipeline* pipeline = crenhashtable_lookup(renderer->pipelinesLib, CREN_PIPELINE_QUAD_DEFAULT_NAME);
+			vkPipeline* pipeline = (vkPipeline*)crenhashtable_lookup(renderer->pipelinesLib, CREN_PIPELINE_QUAD_DEFAULT_NAME);
 
 			cmdBuffer = renderer->hint_viewport == 1 ? renderer->viewportRenderphase.renderpass->commandBuffers[currentFrame] : renderer->defaultRenderphase.renderpass->commandBuffers[currentFrame];
 			pipelineLayout = pipeline->layout;
@@ -3669,9 +3735,9 @@ void crenvk_quad_render(CRenContext* context, vkRenderStage stage, CRenQuad* qua
 			break;
 		}
 
-		case VK_RENDER_STAGE_PICKING:
+        case Picking:
 		{
-			vkPipeline* pipeline = crenhashtable_lookup(renderer->pipelinesLib, CREN_PIPELINE_QUAD_PICKING_NAME);
+			vkPipeline* pipeline = (vkPipeline*)crenhashtable_lookup(renderer->pipelinesLib, CREN_PIPELINE_QUAD_PICKING_NAME);
 
 			cmdBuffer = renderer->pickingRenderphase.renderpass->commandBuffers[currentFrame];
 			pipelineLayout = pipeline->layout;

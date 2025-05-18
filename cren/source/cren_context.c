@@ -1,19 +1,27 @@
 #include "cren_context.h"
 
+#include "cren_error.h"
 #include "cren_vulkan.h"
 
-CRenContext* cren_initialize(CRenCreateInfo* createInfo) {
+CRenContext* cren_initialize(CRenCreateInfo createInfo) {
+    CREN_LOG("CRen: Todo: Make the assertion macro to call a function to display to the console, better than including stdio in a header\n");
 
     CRenContext* context = (CRenContext*)crenmemory_allocate(sizeof(CRenContext), 1);
-    if(!context) return NULL;
+    if (!context) {
+        cren_set_error(ContextIntializationFailed);
+        return NULL;
+    }
 
     context->backend = (CRenVulkanBackend*)crenmemory_allocate(sizeof(CRenVulkanBackend), 1);
-    if(!context->backend) return NULL;
+    if (!context->backend) {
+        cren_set_error(ContextIntializationFailed);
+        return NULL;
+    }
 
     context->createInfo = createInfo;
-    context->camera = cren_camera_create(CAMERA_TYPE_FREE_LOOK, (float)(createInfo->width / createInfo->height));
+    context->camera = cren_camera_create(CAMERA_TYPE_FREE_LOOK, (float)createInfo.width / (float)createInfo.height);
 
-    cren_vulkan_init(context->backend, createInfo);
+    cren_vulkan_init((CRenVulkanBackend*)context->backend, &context->createInfo);
 
     return context;
 }
@@ -42,8 +50,8 @@ void cren_render(CRenContext* context, double timestep)
 
 void cren_resize(CRenContext *context, int width, int height)
 {
-    context->createInfo->width = width;
-    context->createInfo->height = height;
+    context->createInfo.width = width;
+    context->createInfo.height = height;
 
     CRenVulkanBackend* renderer = (CRenVulkanBackend*)context->backend;
     renderer->hint_resize = 1;

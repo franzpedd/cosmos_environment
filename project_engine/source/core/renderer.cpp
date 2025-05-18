@@ -4,24 +4,24 @@
 
 namespace Cosmos
 {
-	Renderer::Renderer(Application* app) 
+	Renderer::Renderer(Application* app, const char* appName, bool requestViewport) 
         : mApp(app)
 	{
         // initialization
         CRenCreateInfo ci = { 0 };
-        ci.appName = "Engine";
+        ci.appName = appName;
         ci.appVersion = CREN_MAKE_VERSION(0, 1, 0, 0);
-        ci.assetsRoot = "../data";
+        ci.assetsRoot = "data";
         ci.apiVersion = CREN_MAKE_VERSION(0, 1, 0, 2);
         ci.validations = 1;
         ci.vsync = 0;
         ci.msaa = 4;
         ci.width = mApp->GetWindowRef().GetWidth();
         ci.height = mApp->GetWindowRef().GetHeight();
-        ci.smallerViewport = 1;
+        ci.smallerViewport = (int)requestViewport;
         ci.nativeWindow = mApp->GetWindowRef().GetNativeWindow();
 
-        mContext = cren_initialize(&ci);
+        mContext = cren_initialize(ci);
         COSMOS_ASSERT(mContext != nullptr, "Failed to initialize CRen");
 
         // callbacks
@@ -42,7 +42,7 @@ namespace Cosmos
             rendererClass.OnResizeCallback(width, height);
             });
 
-        cren_set_render_callback(mContext, [](CRenContext* context, int stage, double timestep) {
+        cren_set_render_callback(mContext, [](CRenContext* context, CRenRenderStage stage, double timestep) {
             Renderer& rendererClass = *(Renderer*)cren_get_user_pointer(context);
             rendererClass.OnRenderCallback(stage, timestep);
             });
@@ -63,11 +63,28 @@ namespace Cosmos
         cren_render(mContext, timestep);
     }
 
+    void Renderer::Minimize()
+    {
+        cren_minimize(mContext);
+    }
+
+    void Renderer::Restore()
+    {
+        cren_restore(mContext);
+    }
+
+    void Renderer::Resize(int width, int height)
+    {
+        cren_resize(mContext, width, height);
+    }
+
     void Renderer::OnRenderCallback(int stage, double timestep)
     {
+        mApp->GetGUIRef().OnRender(stage);
     }
 
     void Renderer::OnResizeCallback(int width, int height)
     {
+
     }
 }
